@@ -1,51 +1,73 @@
 package io.github.jeroenvervaeke.coffeefinder.engine
 
-import android.content.Context
 import io.github.jeroenvervaeke.coffeefinder.data.MongoSeam
-import io.github.jeroenvervaeke.embeddedmongodb.EmbeddedMongo
+import io.github.jeroenvervaeke.embeddedmongodb.FreeDiskFloor
+import io.github.jeroenvervaeke.embeddedmongodb.StorageOptions
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * The one database this process has, opened once and kept for as long as the application runs.
  *
- * The engine refuses a second runtime in a process, so opening is behind a mutex rather than left
- * to whichever screen asks first. Its directory is named here and excluded from backup in the
+ * The engine allows one runtime per process, so opening is behind a mutex rather than left to
+ * whichever screen asks first. Its directory is named here and excluded from backup in the
  * manifest by the same name — a restored WiredTiger directory is corrupt, not migrated.
  *
- * The engine's storage limits are left at their defaults, and one of them is a known limitation
- * here: MongoDB will not start an index build with less than 500 MB free. That is a server's
- * number, and this database is about 10 MB — so a phone near its limit can open the database and
- * never finish seeding it, failing `createIndexes` with `OutOfDiskSpace` on every launch. The
- * startup screen reports that rather than the application avoiding it. Naming a floor sized for
- * this data is the fix, and wants a `StorageOptions` the library's `master` does not yet carry.
+ * The open runs in [scope], which belongs to the application, rather than in the coroutine that
+ * happened to ask first. That is deliberate: the first ask comes from a `ViewModel`, whose scope
+ * dies when the screen does, and leaving a screen while the engine is starting is an ordinary
+ * thing to do. Tied to the caller, that cancellation throws away an engine that came up anyway —
+ * the library closes it rather than stranding it, but the next screen then pays for a second
+ * cold start. Held here, the open finishes and the next screen is handed the result.
  */
-class CoffeeDatabase(private val context: Context) {
-    private val opening = Mutex()
-    private var opened: EmbeddedMongo? = null
+class CoffeeDatabase(
+    private val directory: File,
+    private val scope: CoroutineScope,
+    private val opener: DatabaseOpener,
+) {
+    private val lock = Mutex()
+    private var starting: Deferred<OpenDatabase>? = null
 
-    /**
-     * Opens the database if it is not open yet and returns the seam onto it.
-     *
-     * Suspends: `EmbeddedMongo.open` refuses to run on the main thread, and dispatches itself off
-     * whichever thread calls it.
-     */
-    suspend fun seam(): MongoSeam = EmbeddedMongoSeam(database())
+    /** Opens the database if it is not open yet and returns the seam onto it. */
+    suspend fun seam(): MongoSeam = database().seam
 
     /**
      * Closes the database, waiting for an open in flight rather than racing it.
      *
-     * Under the same lock as opening: without it, a close that overlapped an open would leave
-     * `opened` holding a database nobody closed, or close one a caller was about to be handed.
+     * Never called by this application — Android ends the process instead, and a journalled write
+     * has nothing left to flush — but a database that cannot be closed is a database that cannot
+     * be reopened, so it is here and it is correct.
      */
-    suspend fun close() = opening.withLock {
-        opened?.close()
-        opened = null
+    suspend fun close() = withContext(NonCancellable) {
+        val opening = lock.withLock { starting.also { starting = null } }
+        // An open that failed, or one whose scope went away, produced no database to close. The
+        // swallow is safe under NonCancellable: there is no caller cancellation to lose.
+        opening?.runCatching { await() }?.getOrNull()?.close()
+        Unit
     }
 
-    private suspend fun database(): EmbeddedMongo = opening.withLock {
-        opened ?: EmbeddedMongo.open(context, File(context.filesDir, DIRECTORY)).also { opened = it }
+    private suspend fun database(): OpenDatabase {
+        val opening = lock.withLock {
+            starting ?: scope.async { opener.open(directory, COFFEE_STORAGE) }.also { starting = it }
+        }
+        return try {
+            opening.await()
+        } catch (failure: Throwable) {
+            // A *caller* that was cancelled leaves the open running for whoever asks next, so the
+            // result is still worth keeping. An open that actually failed must not be: remembered,
+            // it would be the answer every later screen got, and the application could never try
+            // again. NonCancellable because the caller is usually already cancelled by here.
+            if (opening.isCompleted) {
+                withContext(NonCancellable) { lock.withLock { if (starting === opening) starting = null } }
+            }
+            throw failure
+        }
     }
 }
 
@@ -53,4 +75,29 @@ class CoffeeDatabase(private val context: Context) {
  * Relative to `filesDir`, and the same name the backup exclusion rules use. Changing one without
  * the other starts backing the database up again.
  */
-private const val DIRECTORY = "coffee"
+const val COFFEE_DIRECTORY = "coffee"
+
+/**
+ * The one storage limit this application knows better than the library does.
+ *
+ * MongoDB will not start an index build with less than 500 MB free, and this application's cold
+ * start is a bulk insert followed by two index builds. That default is sized for a server: an
+ * Ireland-scale directory here holds about 2.25 MiB of documents and indexes and occupies about
+ * 10.25 MiB with its journal, so a phone with 400 MB free could open the database and never
+ * finish seeding it — `createIndexes` failing with `OutOfDiskSpace` on every launch.
+ *
+ * 64 MiB is about six times the finished directory and roughly two and a half times the transient
+ * peak while the indexes are being built, which is the shape the library asks for: lower it to
+ * what the work about to be done actually needs, not to what will fit. It is deliberately not
+ * lower. The floor is a pre-flight check and the only warning there is — nothing stops a build
+ * that runs out part-way, and WiredTiger answers a genuinely full disk by aborting the process,
+ * with no exception to catch. The margin is the whole of the protection.
+ *
+ * Naming it also lowers the check the library makes before the engine is opened at all, from
+ * 256 MiB to this, which is the intended pairing: an application that says 64 MiB is enough
+ * should not be refused at 256.
+ *
+ * Nothing else is second-guessed. The cache is a ceiling WiredTiger grows into rather than memory
+ * it takes, and this database is far too small to reach it.
+ */
+internal val COFFEE_STORAGE = StorageOptions(freeDiskFloor = FreeDiskFloor.ofMebibytes(64))

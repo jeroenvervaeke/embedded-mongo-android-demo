@@ -109,6 +109,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.coroutines.test)
 
     // Location only. The rest of Play services is not on the classpath, and nothing in this
     // application talks to a network.

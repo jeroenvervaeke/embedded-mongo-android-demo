@@ -49,7 +49,7 @@ has never been run.
 | | |
 | --- | --- |
 | `./gradlew :data:test` | **runs, green.** 134 tests, no Android SDK needed |
-| `./gradlew :app:testDebugUnitTest` | **runs, green.** 16 tests, four of them over the real shipped seed |
+| `./gradlew :app:testDebugUnitTest` | **runs, green.** 29 tests — the real seed, the packaged assets, and the engine's lifecycle against a fake opener |
 | `./gradlew :app:compileDebugKotlin` | **compiles**, against the real library classes |
 | `./gradlew :app:compileReleaseKotlin` | **compiles** |
 | `./gradlew :app:assembleDebug`, `:app:lintDebug` | **blocked**: both need `cargoJniLibs` |
@@ -103,8 +103,9 @@ one implementation that talks to `EmbeddedMongo`, and it is a dozen lines of del
 
 That is not an abstraction added for its own sake. It is what let this application be written and
 tested while the engine could not be linked, and it is what makes the engine swappable when the
-release lands: `EmbeddedMongoSeam` and `CoffeeDatabase` — one file that forwards commands, one
-that opens and closes the database — are the only two that touch the library at all.
+release lands: `EmbeddedMongoSeam` forwards commands and `EmbeddedMongoOpener` starts the engine,
+and they are the only two files that name `EmbeddedMongo` at all. `CoffeeDatabase` holds the
+lifecycle around them and no engine type, which is what makes that lifecycle testable.
 
 ## Depending on the library
 
@@ -145,13 +146,23 @@ directory restored onto another device, or onto another build of the application
 database rather than a migrated one. From API 31 that attribute only covers cloud backup, so
 `data_extraction_rules.xml` excludes the directory from device-to-device transfer as well.
 
-**The free-disk floor is left at MongoDB's 500 MB, and that is a known limitation.** MongoDB
-refuses to start an index build with less than that free. It is a server's number, and this whole
-database is about 10 MB — so a phone with 400 MB free can open the database and never finish
-seeding it: `createIndexes` fails with `OutOfDiskSpace` on every launch, and the startup screen
-reports it. The library has grown a `StorageOptions.freeDiskFloor` for exactly this, and naming
-64 MiB there is the fix. It is on an unmerged branch, and building against it would mean this
-application did not compile against the library's `master`, so it is not used here.
+**The free-disk floor is lowered to 64 MiB.** MongoDB will not start an index build with less
+than 500 MB free, and this application's cold start is a bulk insert followed by two index
+builds — so at the default a phone with 400 MB free could open the database and never finish
+seeding it. The library keeps 500 MB for every caller and lets one that knows better say so:
+an Ireland-scale directory here is about 10.25 MiB with its journal, and 64 MiB is roughly six
+times that. It is deliberately not lower. Nothing stops a build that runs out part-way —
+WiredTiger answers a genuinely full disk by aborting the process, with nothing to catch — so the
+floor is the only warning there is and the margin is the whole of the protection. Naming it also
+lowers the library's pre-open check from 256 MiB to match.
+
+**The engine is opened in an application-scoped coroutine, not the caller's.** The first ask
+comes from a `ViewModel`, and leaving a screen while the engine is still starting is an ordinary
+thing to do. Tied to that scope, the cancellation throws away an engine that came up anyway and
+the next screen pays for a second cold start; the library closes it rather than stranding it, but
+the work is still lost. Held by the application, the open finishes and the next screen is handed
+the result. That scope is a `SupervisorJob`, because a failed open must not take the scope down
+with it and leave the application unable to try again.
 
 **The seed asset is `ireland.bson.gzip`, not `.gz`.** AGP's asset merger silently gunzips any
 asset whose extension is exactly `gz` and packages it under the name without the extension — so
