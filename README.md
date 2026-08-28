@@ -1,1 +1,189 @@
-# embedded-mongo-android-demo
+# Coffee Offline
+
+Every coffee place on the island of Ireland, searchable on a phone with the aeroplane mode
+switch on. No server, no network call, no API key, and no map SDK.
+
+The database is [embedded-mongodb][library] — MongoDB's own query engine and WiredTiger,
+compiled into the application process. The queries are the ones a server would run: `$geoNear`
+over a `2dsphere` index for what is nearest, `$text` for search, `$geoWithin` with a polygon for
+what the map is showing. There is a screen that prints the exact command behind whatever is on
+screen, because that is the only way to tell a real engine from a hand-rolled index with a
+MongoDB-shaped name on it.
+
+The map is drawn on a `Canvas` from the coordinates the query returned. There are no tiles under
+it. Ireland is recognisable because five thousand coffee places are enough to draw its towns and
+its coast road — the shape is the data.
+
+## This project is not a MongoDB product
+
+Not supported by, endorsed by, or affiliated with MongoDB, Inc. No MongoDB logo or branding is
+used here. It is an independent demonstration of an embedded build of the engine.
+
+## Data, attribution and licences
+
+Places come from the [Overture Maps Foundation](https://overturemaps.org), release 2026-08-19.0,
+accessed 2026-08-27. **The data has been modified**: filtered to four coffee categories inside a
+bounding box around Ireland, and reshaped into the documents this application stores.
+
+© 2026 Foursquare Labs, Inc. All rights reserved.
+
+Contributing datasets are covered by CDLA-Permissive-2.0, the Apache License 2.0 with the
+Foursquare NOTICE, and CC0-1.0. **All four texts ship inside the application** — in
+`app/src/main/assets/places/licenses/`, shown in full on the About screen — because naming a
+licence does not satisfy it: CDLA-Permissive-2.0 section 2.1 and the NOTICE both require the text
+to travel with the data. CC0-1.0 imposes no such condition and is shipped anyway, so that every
+licence the data is under can be read inside the application.
+`app/src/main/assets/places/ireland.attribution.txt` records the extraction and every
+modification made to the data, and `licenses/SOURCES` records where each text was fetched from.
+
+The seed itself is `app/src/main/assets/places/ireland.bson.gz`: 5,180 documents of concatenated
+BSON, gzipped to 454 KB, produced by the library's `scripts/build-places-seed`.
+
+## What is built, and what is not
+
+The library's published engine prebuilts predate a change to its native inputs, so its freshness
+gate refuses to link an AAR from this checkout and a release is being published. Everything that
+does not need the native library is written and verified; everything that does is written and
+has never been run.
+
+| | |
+| --- | --- |
+| `./gradlew :data:test` | **runs, green.** 134 tests, no Android SDK needed |
+| `./gradlew :app:testDebugUnitTest` | **runs, green.** 16 tests, four of them over the real shipped seed |
+| `./gradlew :app:compileDebugKotlin` | **compiles**, against the real library classes |
+| `./gradlew :app:compileReleaseKotlin` | **compiles** |
+| `./gradlew :app:assembleDebug`, `:app:lintDebug` | **blocked**: both need `cargoJniLibs` |
+
+No device or emulator has run any of this. The seeding, the engine seam and every screen are
+written and unexercised — no engine has ever answered one of these pipelines.
+
+What *is* checked against reality rather than against a fake: `ShippedSeedTest` reads the seed
+through the same stream reader and parser the application uses, and asserts that all 5,180
+documents parse, that every place is inside the extent the seed was extracted with, and that
+every category in it is one the application knows. `ShippedAssetsTest` goes one step further and
+reads what AGP's asset merger actually produced, because the packaged assets are not the same
+files as the source tree's.
+
+## Layout
+
+```
+data/                       plain Kotlin: no Android, no embedded-mongodb
+  MongoSeam.kt              the one interface the engine is reached through
+  PlaceRepository.kt        the three questions, and the command that answered each
+  model/                    Coordinates, Metres, Viewport, Place, PlaceCategory
+  query/                    every pipeline, built as org.bson.Document
+  parse/                    replies into domain types, at one boundary
+  seed/                     the gzipped BSON stream, and what puts it in the database
+  geo/                      the camera and the projection the canvas draws through
+  finder/                   the two screens' state, as StateFlows
+
+app/                        the Android shell
+  engine/                   EmbeddedMongoSeam -- the whole of the native contact
+  location/                 FusedLocationProvider, with Dublin as the fallback
+  ui/                       Compose: list, map, pipeline, about
+  assets/places/            the seed, its attribution, and the licence texts it must ship with
+                            (named .gzip, not .gz -- see "Things worth knowing")
+```
+
+## The seam
+
+Every call into MongoDB goes through `MongoSeam`, which is two methods wide:
+
+```kotlin
+interface MongoSeam {
+    suspend fun command(command: Document): Document
+    fun documents(command: Document): Flow<Document>
+}
+```
+
+`:data` sits entirely above it and depends on `org.mongodb:bson` and coroutines and nothing else,
+so the pipelines, the parsing, the seeding and the screen state are all tested on the JVM against
+a scripted fake — the same shape the library tests its own cursor paging with. `:app` supplies the
+one implementation that talks to `EmbeddedMongo`, and it is a dozen lines of delegation.
+
+That is not an abstraction added for its own sake. It is what let this application be written and
+tested while the engine could not be linked, and it is what makes the engine swappable when the
+release lands: `EmbeddedMongoSeam` and `CoffeeDatabase` — one file that forwards commands, one
+that opens and closes the database — are the only two that touch the library at all.
+
+## Depending on the library
+
+There is no Maven publication yet, so `settings.gradle.kts` consumes the module as an **included
+build**:
+
+```kotlin
+includeBuild(libraryDir) {
+    dependencySubstitution {
+        substitute(module("io.github.jeroenvervaeke:embedded-mongodb"))
+            .using(project(":embedded-mongodb"))
+    }
+}
+```
+
+An included build rather than a copied module or a checked-in AAR: the library's sources stay in
+their own repository, `:app` sees whatever is checked out there, and there is no copy to go stale.
+A copied `.aar` would have to be refreshed by hand every time the library changed, and copying the
+module in would drag its `buildSrc` and its version catalog along with it.
+
+The path defaults to `../embedded-mongo/android` and is the `embeddedMongoAndroidDir` Gradle
+property, so the two repositories do not have to be siblings. If it is not there, the build says
+so and `:data` and its tests still run — they do not depend on the library at all.
+
+Both builds are pinned to the same AGP and Kotlin, because a composite build compiles them with
+one of each. The AndroidX versions are pinned to what AGP 8.13.2 and `compileSdk` 36 accept;
+anything newer demands AGP 9.1.
+
+## Things worth knowing
+
+**`minSdk` is 28, not the library's 24.** The library's floor is where its prebuilt engine
+libraries are compiled against bionic, and that is a compile-time claim: it has not been run on a
+device below 9.0, and the engine is known to crash on earlier ones. 28 is where this application
+is prepared to say it works. Lowering it belongs with a device that proves it.
+
+**Backup is off.** `android:allowBackup="false"`, which the library requires: a WiredTiger
+directory restored onto another device, or onto another build of the application, is a corrupt
+database rather than a migrated one. From API 31 that attribute only covers cloud backup, so
+`data_extraction_rules.xml` excludes the directory from device-to-device transfer as well.
+
+**The free-disk floor is left at MongoDB's 500 MB, and that is a known limitation.** MongoDB
+refuses to start an index build with less than that free. It is a server's number, and this whole
+database is about 10 MB — so a phone with 400 MB free can open the database and never finish
+seeding it: `createIndexes` fails with `OutOfDiskSpace` on every launch, and the startup screen
+reports it. The library has grown a `StorageOptions.freeDiskFloor` for exactly this, and naming
+64 MiB there is the fix. It is on an unmerged branch, and building against it would mean this
+application did not compile against the library's `master`, so it is not used here.
+
+**The seed asset is `ireland.bson.gzip`, not `.gz`.** AGP's asset merger silently gunzips any
+asset whose extension is exactly `gz` and packages it under the name without the extension — so
+the shipped file would be `places/ireland.bson`, decompressed, and every launch would fail on a
+`FileNotFoundException` for a name that is not there. `ShippedAssetsTest` reads what the merger
+actually produced rather than what the source tree holds, which is the only place that is
+visible.
+
+**`:data` is a plain JVM module, so Android Lint never checks it for platform API levels.** Its
+tests run on a JDK where everything exists. Anything it calls has to exist on API 28 — which
+`InputStream.readNBytes` does not (it is API 33), which is why `BsonDocuments` fills its buffer
+by hand.
+
+**Nothing touches the engine on the main thread.** The suspending API dispatches onto the
+library's own database thread, and the blocking one throws if it is called from the main thread.
+
+**`$text` and `$geoNear` cannot be combined.** Both have to lead a pipeline, and `$geoNear`'s
+`query` option will not take a `$text`. So search matches on the text index and then measures
+distance itself, with a haversine written in the engine's own `$sin`, `$asin` and
+`$degreesToRadians` — on the same sphere `$geoNear` measures on, so the two are comparable. The
+test for it evaluates the expression and checks the answer against distances that are a matter of
+record, rather than pinning the shape of the BSON.
+
+## Building
+
+```sh
+export JAVA_HOME=/path/to/jdk21          # Android Studio's bundled runtime qualifies
+export ANDROID_HOME=/path/to/Android/Sdk
+
+./gradlew :data:test                     # no SDK needed for this one
+./gradlew :app:testDebugUnitTest
+./gradlew :app:assembleDebug             # needs the library's engine to link
+```
+
+[library]: https://github.com/jeroenvervaeke/embedded-mongo
