@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A bare platform theme: everything visible is Compose, and this exists only so the window has
+      a background and no action bar behind it before the first frame.
+    -->
+    <style name="Theme.CoffeeFinder" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

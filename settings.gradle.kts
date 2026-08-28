@@ -31,6 +31,7 @@ dependencyResolutionManagement {
 rootProject.name = "coffee-finder"
 
 include(":data")
+include(":app")
 
 // The library publishes no Maven artifact yet, so the application consumes the module itself.
 // An included build rather than a copied module: the sources stay in their own repository, and

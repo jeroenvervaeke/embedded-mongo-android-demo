@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A cup, drawn inside the 66dp safe zone of the 108dp adaptive-icon canvas so that no launcher
+  shape crops it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFF6EC"
+        android:pathData="M38,44 L68,44 L68,60 A15,15 0 0 1 38,60 Z" />
+
+    <path
+        android:strokeColor="#FFF6EC"
+        android:strokeWidth="5"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M70,48 A9,9 0 0 1 70,64" />
+
+    <path
+        android:fillColor="#FFF6EC"
+        android:pathData="M32,76 L78,76 A3,3 0 0 1 75,80 L35,80 A3,3 0 0 1 32,76 Z" />
+
+    <path
+        android:strokeColor="#FFF6EC"
+        android:strokeWidth="4"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M46,36 C46,31 51,31 51,26" />
+
+    <path
+        android:strokeColor="#FFF6EC"
+        android:strokeWidth="4"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M58,36 C58,31 63,31 63,26" />
+</vector>
