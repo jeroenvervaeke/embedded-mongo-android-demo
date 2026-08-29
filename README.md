@@ -127,6 +127,10 @@ says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
   twice, before there was one. What replaced it is proven on the JVM against a provider that never
   calls back — and the test was watched failing with the timeout taken out — but no phone has yet
   been observed reaching the end of the budget and saying so.
+- **No APK built without this application's own R8 rule has been on a phone.** The rule that came
+  out was a duplicate of one the library already ships, so it changed nothing R8 keeps or drops,
+  and `:app:assembleRelease` was watched succeeding without it — but the hardware run above was
+  made with the duplicate still there.
 - **32-bit and Android 9–13 remain untested.** One arm64 phone on API 36 is one phone.
 
 ## Layout
