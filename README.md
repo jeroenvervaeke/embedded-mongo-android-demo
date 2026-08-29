@@ -112,8 +112,8 @@ says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
   on relaunch and came back with exactly 5,180. That one is still an emulator result; the phone
   was interrupted with the database open rather than mid-seed.
 - **R8 keeps what it must.** The release build seeds, queries, renders `Document.toJson` on the
-  pipeline screen and reads the licence assets, on the library's `consumer-rules.pro` plus the
-  one rule below — which the library has since taken over, see "Building".
+  pipeline screen and reads the licence assets, on the library's `consumer-rules.pro` alone —
+  this application adds no rule of its own.
 
 ### Still unverified
 
@@ -282,14 +282,13 @@ export ANDROID_HOME=/path/to/Android/Sdk
 ./gradlew :app:assembleDebug             # needs the library's engine to link
 ```
 
-**R8 needs one rule that is on its way out.** `org.mongodb:bson` carries
-`org.bson.diagnostics.SLF4JLogger`, which references SLF4J that nothing here puts on the
-classpath. The class is unreachable, but R8 refuses to finish with a dangling reference, so
-`app/proguard-rules.pro` carries `-dontwarn org.slf4j.**`. `bson` is an `api` dependency of the
-library, so every consumer that minifies hits this — and the library now ships that rule in its
-own `consumer-rules.pro`. Verified both ways: against a library checkout without it the release
-build fails on `Missing class org.slf4j.Logger`, and against one with it the build succeeds with
-the rule here deleted. It is kept only so that this application still builds against a checkout
-older than that, and should go when there is a reason to require a newer one.
+**R8 needs no rule from this application.** `app/proguard-rules.pro` is a comment and nothing
+else. Everything a minified build needs — the JNI entry points, the BSON codecs, and a `-dontwarn`
+for the SLF4J backend `org.mongodb:bson` carries and nothing here puts on the classpath — comes
+from the library's own `consumer-rules.pro`. That last one used to be duplicated here, because
+`bson` is an `api` dependency of the library and every consumer that minifies inherits the
+dangling reference; the library has since taken it over, so this build now requires a library
+checkout at `808276e` or later. Against an older one the release build fails outright on
+`Missing class org.slf4j.Logger`.
 
 [library]: https://github.com/jeroenvervaeke/embedded-mongo
