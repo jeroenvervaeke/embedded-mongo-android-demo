@@ -123,10 +123,11 @@ says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
   has not been exercised on a device.
 - **The device was in one place.** `$geoNear` from a real fix was measured in Dublin, so a fix
   outside the seed's bounding box has not been seen.
-- **The ten-second budget has not been seen expiring on a device.** The hang it exists for was,
-  twice, before there was one. What replaced it is proven on the JVM against a provider that never
-  calls back — and the test was watched failing with the timeout taken out — but no phone has yet
-  been observed reaching the end of the budget and saying so.
+- **The location fixes were made by reading, not on a device.** The hang they close was seen on
+  the phone, twice; none of what replaced it has been. The budget expiring, the location button
+  after a tap on the map, a retry after a failed start, and a process restored between a second
+  permission refusal and a launch are proven on the JVM — every one of those tests was watched
+  failing against the code it replaced — but no phone has been observed in any of the four.
 - **No APK built without this application's own R8 rule has been on a phone.** The rule that came
   out was a duplicate of one the library already ships, so it changed nothing R8 keeps or drops,
   and `:app:assembleRelease` was watched succeeding without it — but the hardware run above was
