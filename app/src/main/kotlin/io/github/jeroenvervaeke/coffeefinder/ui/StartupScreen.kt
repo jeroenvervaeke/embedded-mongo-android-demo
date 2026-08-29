@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,7 +41,7 @@ fun StartupScreen(progress: SeedProgress, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun StartupFailureScreen(reason: String, modifier: Modifier = Modifier) {
+fun StartupFailureScreen(reason: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -53,6 +54,9 @@ fun StartupFailureScreen(reason: String, modifier: Modifier = Modifier) {
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 12.dp),
         )
+        Button(onClick = onRetry, modifier = Modifier.padding(top = 24.dp)) {
+            Text("Try again")
+        }
     }
 }
 

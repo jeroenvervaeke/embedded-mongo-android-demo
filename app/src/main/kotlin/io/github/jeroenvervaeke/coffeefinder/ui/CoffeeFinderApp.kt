@@ -29,18 +29,18 @@ private enum class Destination(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun CoffeeFinderApp(model: FinderViewModel) {
+fun CoffeeFinderApp(model: FinderViewModel, onRequestLocation: () -> Unit) {
     val startup by model.startup.collectAsStateWithLifecycle()
 
     when (val state = startup) {
         is Startup.Preparing -> StartupScreen(state.progress)
-        is Startup.Failed -> StartupFailureScreen(state.reason)
-        is Startup.Ready -> Finder(state, model)
+        is Startup.Failed -> StartupFailureScreen(state.reason, model::retry)
+        is Startup.Ready -> Finder(state, model, onRequestLocation)
     }
 }
 
 @Composable
-private fun Finder(ready: Startup.Ready, model: FinderViewModel) {
+private fun Finder(ready: Startup.Ready, model: FinderViewModel, onRequestLocation: () -> Unit) {
     var destination by rememberSaveable { mutableStateOf(Destination.NEARBY) }
     val locationSource by model.locationSource.collectAsStateWithLifecycle()
 
@@ -60,7 +60,8 @@ private fun Finder(ready: Startup.Ready, model: FinderViewModel) {
     ) { padding ->
         val content = Modifier.padding(padding)
         when (destination) {
-            Destination.NEARBY -> NearbyScreen(ready.nearby, locationSource, model::locate, content)
+            Destination.NEARBY ->
+                NearbyScreen(ready.nearby, locationSource, onRequestLocation, content)
             Destination.MAP -> MapScreen(ready.map, ready.nearby, model::measureFrom, content)
             Destination.PIPELINE -> PipelineScreen(ready.nearby, ready.map, content)
             Destination.ABOUT -> AboutScreen(content)

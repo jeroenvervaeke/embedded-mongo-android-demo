@@ -37,6 +37,23 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
     val locationSource: StateFlow<LocationSource> get() = source
 
     init {
+        start()
+    }
+
+    /**
+     * Tries again after a failed start.
+     *
+     * The scope the engine opens in is a supervisor precisely so that a failure leaves it usable,
+     * and that is only worth anything if something reaches this. A device that was full when the
+     * application first started recovers by freeing space and tapping retry, rather than by being
+     * killed.
+     */
+    fun retry() {
+        if (preparing.value is Startup.Failed) start()
+    }
+
+    private fun start() {
+        preparing.value = Startup.Preparing(SeedProgress.Checking)
         viewModelScope.launch { prepare() }
     }
 
