@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Coarse only. The nearest coffee place is not a question that needs a metre of precision, and
+      asking for less is a permission more people grant. Both are optional: refusing them falls
+      back to Dublin rather than to an empty screen.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+
+    <!--
+      allowBackup is off because a WiredTiger directory restored onto another device, or onto
+      another build of this application, is a corrupt database rather than a migrated one. That
+      covers cloud backup; from API 31 device-to-device transfer is configured separately, which
+      is what data_extraction_rules.xml is for. The library's android/README.md is the source of
+      this requirement.
+    -->
+    <application
+        android:name=".CoffeeFinderApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CoffeeFinder">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.CoffeeFinder">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

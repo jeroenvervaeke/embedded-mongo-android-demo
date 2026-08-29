@@ -1,0 +1,54 @@
+Overture Maps places -- Ireland, including Northern Ireland
+======================================================================
+
+Source      Overture Maps Foundation, overturemaps.org
+Release     2026-08-19.0
+Theme/type  places / place
+Extracted   2026-08-27 (UTC)
+Extent      longitude -10.8..-5.3, latitude 51.3..55.5
+Categories  cafe, coffee_shop, cafeteria, coffee_roastery
+Documents   5180
+
+Licensing
+---------
+The places theme contains no OpenStreetMap data and therefore carries no
+share-alike obligation. Its contributing datasets, per
+https://docs.overturemaps.org/attribution/ (read 2026-08-27), are:
+
+  Meta, Microsoft, PinMeTo, Krick, RenderSEO, DAC, BrightQuery
+      Community Data License Agreement -- Permissive, Version 2.0
+  Foursquare
+      Apache License 2.0, plus the NOTICE reproduced in licenses/NOTICE.txt
+  AllThePlaces
+      CC0 1.0 Universal
+
+The full text of each licence is in licenses/ beside this file, because naming
+a licence does not satisfy it: CDLA-Permissive-2.0 section 2.1 requires the
+agreement text to travel with the data, and the Foursquare NOTICE requires both
+a copy of Apache 2.0 and its own full content. CC0 1.0 imposes no condition, so
+AllThePlaces needs nothing beyond the credit above.
+
+Attribution
+-----------
+Overture invites a citation rather than requiring one. Their wording is that
+you "may choose to add the following citation, including the date the data
+were accessed":
+
+  Overture Maps Foundation, overturemaps.org.
+  Release 2026-08-19.0, accessed 2026-08-27.
+
+The Foursquare notice is not optional. Apache License 2.0 and the NOTICE
+itself require redistribution to preserve its full content and to ship a copy
+of the licence, both of which are in licenses/:
+
+  © 2026 Foursquare Labs, Inc. All rights reserved.
+
+Modifications
+-------------
+Foursquare's data was transformed into the Overture schema by the Overture Maps
+Foundation, who record that change as 2026-03-18. This extract makes two
+further changes. It keeps only places whose primary category is one of the
+categories named above, that fall inside the extent named above, that carry a
+name and a geometry, and whose confidence is at least 0. It then
+reshapes each record to _id, name, cat, brand, confidence, addr and a GeoJSON
+loc point, dropping every other Overture column.
