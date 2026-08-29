@@ -64,7 +64,9 @@ private fun InputStream.fill(target: ByteArray, offset: Int, length: Int): Int {
     var filled = 0
     while (filled < length) {
         val read = read(target, offset + filled, length - filled)
-        if (read < 0) break
+        // `<= 0`, not `< 0`: a stream that keeps answering zero is not making progress, and
+        // treating that as "more to come" is a loop that never ends.
+        if (read <= 0) break
         filled += read
     }
     return filled
