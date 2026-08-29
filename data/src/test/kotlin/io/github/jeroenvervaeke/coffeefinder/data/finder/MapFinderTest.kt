@@ -10,7 +10,9 @@ import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.testTimeSource
 
 class MapFinderTest {
     @Test
@@ -182,9 +184,26 @@ class MapFinderTest {
         assertEquals(2, ready(finder).places.size)
     }
 
+    @Test
+    fun `a settled pan reports what the engine cost, and not the settle it waited out`() = runTest {
+        val finder = MapFinder(placesIn(slow()), backgroundScope, clock = testTimeSource)
+
+        settle()
+
+        // Exactly the engine's own time. The debounce in front of the query is longer than this,
+        // so an implementation that started the clock at the gesture instead of at the query
+        // could not produce this number -- which is the whole point of asserting it exactly.
+        assertEquals(ENGINE_TIME, ready(finder).took)
+    }
+
     private fun found() = FakeMongo(
         queryResults = { listOf(placeDocument(), placeDocument(id = "second", name = "Bean and Leaf")) },
     )
 
+    private fun slow() = FakeMongo(queryResults = { listOf(placeDocument()) }, answersIn = ENGINE_TIME)
+
     private fun ready(finder: MapFinder) = finder.state.value as MapState.Ready
 }
+
+/** Long enough to tell from zero, and shorter than the debounce it must not be confused with. */
+private val ENGINE_TIME = 40.milliseconds

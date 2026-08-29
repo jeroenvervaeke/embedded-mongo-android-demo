@@ -6,6 +6,8 @@ import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
 import io.github.jeroenvervaeke.coffeefinder.data.model.Metres
 import io.github.jeroenvervaeke.coffeefinder.data.model.PlaceCategory
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.TimeSource
+import kotlin.time.measureTimedValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -29,6 +31,8 @@ class NearbyFinder(
     private val places: PlaceRepository,
     scope: CoroutineScope,
     private val limit: Int = DEFAULT_LIMIT,
+    /** Where [NearbyState.Ready.took] is read from. See [MapFinder]'s for why it is injected. */
+    private val clock: TimeSource = TimeSource.Monotonic,
 ) {
     private val request = MutableStateFlow(Request(origin = Ireland.DUBLIN))
 
@@ -55,12 +59,14 @@ class NearbyFinder(
 
     private suspend fun load(request: Request): NearbyState = try {
         val text = request.text.trim()
-        val found = if (text.isEmpty()) {
-            places.nearest(request.origin, limit, request.maxDistance, request.category)
-        } else {
-            places.search(text, request.origin, limit, request.category, request.maxDistance)
+        val (found, took) = clock.measureTimedValue {
+            if (text.isEmpty()) {
+                places.nearest(request.origin, limit, request.maxDistance, request.category)
+            } else {
+                places.search(text, request.origin, limit, request.category, request.maxDistance)
+            }
         }
-        NearbyState.Ready(found.results, found.command)
+        NearbyState.Ready(found.results, found.command, took)
     } catch (cancelled: CancellationException) {
         // A superseded query, cancelled by mapLatest. Reporting it would replace the results of
         // the query that superseded it with an error nobody caused.

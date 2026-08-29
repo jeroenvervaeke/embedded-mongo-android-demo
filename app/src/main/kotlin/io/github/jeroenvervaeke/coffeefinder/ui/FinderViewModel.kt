@@ -7,7 +7,9 @@ import io.github.jeroenvervaeke.coffeefinder.CoffeeFinderApplication
 import io.github.jeroenvervaeke.coffeefinder.SEED_ASSET
 import io.github.jeroenvervaeke.coffeefinder.data.PlaceRepository
 import io.github.jeroenvervaeke.coffeefinder.data.finder.MapFinder
+import io.github.jeroenvervaeke.coffeefinder.data.finder.MapState
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyFinder
+import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyState
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.seed.SeedProgress
 import io.github.jeroenvervaeke.coffeefinder.data.seed.Seeder
@@ -92,18 +94,42 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun prepare() {
         try {
+            // Constructed before the database is asked for, so that opening the engine is inside
+            // what it measures rather than in front of it.
+            val startup = StartupTimer()
             val mongo = getApplication<CoffeeFinderApplication>().database.seam()
             Seeder(mongo).seed { getApplication<Application>().assets.open(SEED_ASSET) }
-                .collect { progress -> preparing.value = Startup.Preparing(progress) }
+                .collect { progress ->
+                    preparing.value = Startup.Preparing(progress)
+                    startup.reached(progress)
+                }
             val places = PlaceRepository(mongo)
-            preparing.value = Startup.Ready(
+            val ready = Startup.Ready(
                 nearby = NearbyFinder(places, viewModelScope),
                 map = MapFinder(places, viewModelScope),
             )
+            preparing.value = ready
+            reportQueriesOf(ready)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
             preparing.value = Startup.Failed(failure.message ?: failure.javaClass.simpleName)
+        }
+    }
+
+    /**
+     * Prints what every finished query cost.
+     *
+     * Collected here rather than from a screen: a query runs whether or not the screen that asked
+     * for it is on top, and a collector tied to a composition would miss exactly the ones that ran
+     * while it was not — which on the map is most of a gesture.
+     */
+    private fun reportQueriesOf(ready: Startup.Ready) {
+        viewModelScope.launch {
+            ready.nearby.state.collect { if (it is NearbyState.Ready) logQuery("nearby", it.places.size, it.took) }
+        }
+        viewModelScope.launch {
+            ready.map.state.collect { if (it is MapState.Ready) logQuery("map", it.places.size, it.took) }
         }
     }
 }

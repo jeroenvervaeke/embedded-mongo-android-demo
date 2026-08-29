@@ -3,6 +3,7 @@ package io.github.jeroenvervaeke.coffeefinder.data.finder
 import io.github.jeroenvervaeke.coffeefinder.data.model.NearbyPlace
 import io.github.jeroenvervaeke.coffeefinder.data.model.Place
 import io.github.jeroenvervaeke.coffeefinder.data.model.Viewport
+import kotlin.time.Duration
 import org.bson.Document
 
 /**
@@ -16,7 +17,18 @@ sealed interface NearbyState {
     /** Before the first reply, and while a changed query is in flight. */
     data object Searching : NearbyState
 
-    data class Ready(val places: List<NearbyPlace>, val command: Document) : NearbyState
+    data class Ready(
+        val places: List<NearbyPlace>,
+        val command: Document,
+        /**
+         * How long the engine took to answer, measured around the query and nothing else.
+         *
+         * Not the whole wait: the debounce in front of it is deliberately outside this, because
+         * the question it exists to answer is what the engine costs, and adding a constant to
+         * every reading would only hide it.
+         */
+        val took: Duration,
+    ) : NearbyState
 
     /** The engine refused the query, or answered something that would not parse. */
     data class Failed(val reason: String) : NearbyState
@@ -30,6 +42,8 @@ sealed interface MapState {
         val viewport: Viewport,
         val places: List<Place>,
         val command: Document,
+        /** What the `$geoWithin` behind this cost. See [NearbyState.Ready.took]. */
+        val took: Duration,
     ) : MapState
 
     data class Failed(val reason: String) : MapState

@@ -69,7 +69,10 @@ fun MapScreen(
             text = when (val current = state) {
                 MapState.Searching -> "Asking the engine what is in view…"
                 is MapState.Failed -> "The query failed: ${current.reason}"
-                is MapState.Ready -> "${current.places.size} places in view. " +
+                // What the pan cost, under the map it was paid for: the one number a person can
+                // check against how the gesture they just made actually felt.
+                is MapState.Ready -> "${current.places.size} places in view, found in " +
+                    "${current.took.describe()}. " +
                     "Drag and pinch to change the polygon; tap to measure from there."
             },
             style = MaterialTheme.typography.bodySmall,

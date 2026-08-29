@@ -3,8 +3,10 @@ package io.github.jeroenvervaeke.coffeefinder.data
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
 import java.util.concurrent.Executors
+import kotlin.time.Duration
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -21,6 +23,13 @@ import org.bson.Document
 class FakeMongo(
     private val commandReply: (Document) -> Document = { okReply() },
     private val queryResults: (Document) -> List<Document> = { emptyList() },
+    /**
+     * How long the engine takes to answer, for the tests that measure that.
+     *
+     * A `delay` rather than a sleep, so it costs virtual time on the test scheduler and no real
+     * time at all -- which is what lets a test assert an exact duration.
+     */
+    private val answersIn: Duration = Duration.ZERO,
 ) : MongoSeam {
     private val issued = mutableListOf<Document>()
     private val ran = mutableListOf<String>()
@@ -35,12 +44,14 @@ class FakeMongo(
     override suspend fun command(command: Document): Document {
         issued += command
         ran += Thread.currentThread().name
+        delay(answersIn)
         return commandReply(command)
     }
 
     override fun documents(command: Document): Flow<Document> = flow {
         issued += command
         ran += Thread.currentThread().name
+        delay(answersIn)
         queryResults(command).forEach { emit(it) }
     }
 }

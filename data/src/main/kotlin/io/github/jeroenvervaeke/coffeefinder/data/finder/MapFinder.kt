@@ -6,6 +6,8 @@ import io.github.jeroenvervaeke.coffeefinder.data.geo.showsSameAs
 import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
+import kotlin.time.TimeSource
+import kotlin.time.measureTimedValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -34,6 +36,14 @@ class MapFinder(
     private val places: PlaceRepository,
     scope: CoroutineScope,
     private val limit: Int = DEFAULT_LIMIT,
+    /**
+     * Where [MapState.Ready.took] is read from.
+     *
+     * Injected so the tests can measure against the virtual clock they already advance by hand.
+     * Left to the monotonic clock, they would time a scripted fake on real threads and assert
+     * about a duration that is whatever the machine felt like.
+     */
+    private val clock: TimeSource = TimeSource.Monotonic,
 ) {
     private val cameraState = MutableStateFlow(Camera.IRELAND)
     private val aspectRatio = MutableStateFlow(Camera.PORTRAIT_ASPECT_RATIO)
@@ -86,8 +96,8 @@ class MapFinder(
 
     private suspend fun load(view: View): MapState = try {
         val viewport = view.camera.viewport(view.aspectRatio)
-        val found = places.inViewport(viewport, limit)
-        MapState.Ready(viewport, found.results, found.command)
+        val (found, took) = clock.measureTimedValue { places.inViewport(viewport, limit) }
+        MapState.Ready(viewport, found.results, found.command, took)
     } catch (cancelled: CancellationException) {
         // Superseded by a later camera, cancelled by mapLatest. Reporting it would replace the
         // results of the query that superseded it with an error nobody caused.

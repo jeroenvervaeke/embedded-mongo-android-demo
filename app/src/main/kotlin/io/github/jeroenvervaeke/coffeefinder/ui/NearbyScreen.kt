@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +49,13 @@ fun NearbyScreen(
 ) {
     val asked by finder.asked.collectAsStateWithLifecycle()
     val state by finder.state.collectAsStateWithLifecycle()
+
+    // A cold start here is an engine opening, five thousand documents going in and two index
+    // builds, and the framework can see none of it. Without a report of its own this application
+    // emits no `Fully drawn` at all -- measured, not assumed: the uninstrumented build logged
+    // only `Displayed`, which is the spinner. Reported on the first list of results instead,
+    // `Fully drawn` in logcat measures the whole of a cold start, dex loading included.
+    ReportDrawnWhen { state is NearbyState.Ready }
 
     Column(modifier.fillMaxSize()) {
         OutlinedTextField(

@@ -20,6 +20,7 @@ import io.github.jeroenvervaeke.coffeefinder.data.finder.MapFinder
 import io.github.jeroenvervaeke.coffeefinder.data.finder.MapState
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyFinder
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyState
+import kotlin.time.Duration
 import org.bson.Document
 
 /**
@@ -41,15 +42,17 @@ fun PipelineScreen(nearby: NearbyFinder, map: MapFinder, modifier: Modifier = Mo
             style = MaterialTheme.typography.bodyMedium,
         )
 
-        Pipeline("Near me", (list as? NearbyState.Ready)?.command, (list as? NearbyState.Ready)?.places?.size)
-        Pipeline("Map", (viewport as? MapState.Ready)?.command, (viewport as? MapState.Ready)?.places?.size)
+        (list as? NearbyState.Ready).let { Pipeline("Near me", it?.command, it?.places?.size, it?.took) }
+        (viewport as? MapState.Ready).let { Pipeline("Map", it?.command, it?.places?.size, it?.took) }
     }
 }
 
 @Composable
-private fun Pipeline(title: String, command: Document?, documents: Int?) {
+private fun Pipeline(title: String, command: Document?, documents: Int?, took: Duration?) {
     Text(
-        text = if (documents == null) title else "$title — $documents documents",
+        // The time belongs next to the command rather than in a corner: this screen exists to
+        // show what the engine was asked, and what that cost is part of the answer.
+        text = if (documents == null) title else "$title — $documents documents in ${took?.describe()}",
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
     )

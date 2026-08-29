@@ -14,10 +14,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.testTimeSource
 import org.bson.Document
 
 class NearbyFinderTest {
@@ -162,10 +164,28 @@ class NearbyFinderTest {
         assertEquals(mongo.lastCommand, ready(finder).command)
     }
 
+    @Test
+    fun `the list reports what the engine cost, and not the keystroke debounce before it`() = runTest {
+        val finder = NearbyFinder(placesIn(slow()), backgroundScope, clock = testTimeSource)
+
+        settle()
+
+        // Exact, and smaller than the debounce: see the same assertion in MapFinderTest.
+        assertEquals(ENGINE_TIME, ready(finder).took)
+    }
+
     private fun found() = FakeMongo(queryResults = { listOf(placeDocument().append("distance", 240.0)) })
+
+    private fun slow() = FakeMongo(
+        queryResults = { listOf(placeDocument().append("distance", 240.0)) },
+        answersIn = ENGINE_TIME,
+    )
 
     private fun ready(finder: NearbyFinder) = finder.state.value as NearbyState.Ready
 }
+
+/** Long enough to tell from zero, and shorter than the debounce it must not be confused with. */
+private val ENGINE_TIME = 40.milliseconds
 
 /** Past the debounce and through the query the finder started after it. */
 internal fun TestScope.settle() {
