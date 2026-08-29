@@ -11,6 +11,9 @@ const val PLACES_COLLECTION = "places"
  */
 const val DISTANCE_FIELD = "distance"
 
+/** The field a `$count` stage writes its total into. */
+const val COUNT_FIELD = "count"
+
 /**
  * How far MongoDB thinks it is to the other side of the planet.
  *

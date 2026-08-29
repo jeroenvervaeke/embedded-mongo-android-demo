@@ -145,10 +145,14 @@ class SeederTest {
     }
 
     @Test
-    fun `a count the engine answered without an n is reported rather than read as empty`() = runTest {
-        val mongo = FakeMongo(commandReply = { okReply() })
+    fun `a count row without a count in it is reported rather than read as empty`() = runTest {
+        // Reading it as empty would be worse than failing: seeding would decide the collection
+        // held nothing and start again over documents that were already there.
+        val mongo = FakeMongo(queryResults = { listOf(Document("total", 5)) })
 
-        assertFailsWith<IOException> { Seeder(mongo, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(1)).toList() }
+        assertFailsWith<IOException> {
+            Seeder(mongo, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(1)).toList()
+        }
     }
 
     @Test
@@ -186,15 +190,21 @@ private class EmptyDatabase(marker: Document? = null) {
     val mongo = FakeMongo(
         commandReply = { command ->
             when {
-                command.containsKey("count") -> okReply("n" to stored)
                 command.getString("insert") == "places" ->
                     okReply("n" to (command["documents"] as List<*>).size)
                         .also { stored += (command["documents"] as List<*>).size }
-                command.containsKey("drop") -> okReply().also { stored = 0 }
+                command.getString("drop") == "places" -> okReply().also { stored = 0 }
                 else -> okReply()
             }
         },
-        queryResults = { listOfNotNull(marker) },
+        queryResults = { command ->
+            when {
+                // `$count` over an empty collection produces no row, exactly as the engine does.
+                command.containsKey("aggregate") ->
+                    if (stored == 0) emptyList() else listOf(Document("count", stored))
+                else -> listOfNotNull(marker)
+            }
+        },
     )
 }
 

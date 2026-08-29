@@ -30,8 +30,20 @@ fun createIndexesCommand(): Document = Document("createIndexes", PLACES_COLLECTI
         ),
     )
 
-/** How many places are stored, which is how seeding decides whether it has anything to do. */
-fun countPlacesCommand(): Document = Document("count", PLACES_COLLECTION)
+/**
+ * How many places are stored, counted by reading them.
+ *
+ * `{count: "places"}` would be answered from collection metadata, and that number is the one this
+ * project has measured going wrong in exactly the situation this application is designed around:
+ * after an unclean shutdown the engine's fast count has been seen reporting 0 against a true count
+ * of about 90,000. Android killing a process mid-seed *is* an unclean shutdown, and seeding
+ * decides whether to trust the marker by comparing it with this. A metadata count that read 5,180
+ * when 4,900 documents were present would leave the map quietly short for ever.
+ *
+ * `$count` walks the collection instead. It costs a scan once per start, which is the price of the
+ * answer being true.
+ */
+fun countPlacesCommand(): Document = aggregate(listOf(Document("\$count", COUNT_FIELD)))
 
 /**
  * Inserts one batch of seed documents.

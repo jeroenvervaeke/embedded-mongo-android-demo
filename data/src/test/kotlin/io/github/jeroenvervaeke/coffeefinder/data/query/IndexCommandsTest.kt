@@ -31,6 +31,20 @@ class IndexCommandsTest {
     }
 
     @Test
+    fun `places are counted by reading them rather than from collection metadata`() {
+        // `{count: "places"}` is answered from metadata, and this project has measured that number
+        // reading 0 against a true count of ~90,000 after an unclean shutdown -- which is what
+        // Android killing the process mid-seed is. Seeding decides whether to trust its marker by
+        // comparing it against this, so the number has to be the real one.
+        assertEquals(
+            Document("aggregate", "places")
+                .append("pipeline", listOf(Document("\$count", "count")))
+                .append("cursor", Document()),
+            countPlacesCommand(),
+        )
+    }
+
+    @Test
     fun `an insert names its documents and does not stop at the first the engine refuses`() {
         val documents = listOf(Document("_id", "a"))
 

@@ -1,6 +1,7 @@
 package io.github.jeroenvervaeke.coffeefinder.data.seed
 
 import io.github.jeroenvervaeke.coffeefinder.data.MongoSeam
+import io.github.jeroenvervaeke.coffeefinder.data.query.COUNT_FIELD
 import io.github.jeroenvervaeke.coffeefinder.data.query.countPlacesCommand
 import io.github.jeroenvervaeke.coffeefinder.data.query.createIndexesCommand
 import io.github.jeroenvervaeke.coffeefinder.data.query.dropPlacesCommand
@@ -99,10 +100,18 @@ class Seeder(
         mongo.documents(findSeedMarkerCommand()).firstOrNull()
             ?.let { (it["documents"] as? Number)?.toInt() }
 
+    /**
+     * How many places are stored, counted by reading them rather than from collection metadata.
+     *
+     * A `$count` over an empty collection produces no row at all, which is the honest answer to
+     * "how many" and is why an absent one is zero rather than a failure.
+     */
     private suspend fun countPlaces(): Int {
-        val reply = mongo.command(countPlacesCommand())
-        return (reply["n"] as? Number)?.toInt()
-            ?: throw IOException("counting places returned no `n` (fields: ${reply.keys.joinToString()})")
+        val counted = mongo.documents(countPlacesCommand()).firstOrNull() ?: return 0
+        return (counted[COUNT_FIELD] as? Number)?.toInt()
+            ?: throw IOException(
+                "counting places returned no `$COUNT_FIELD` (fields: ${counted.keys.joinToString()})",
+            )
     }
 }
 
