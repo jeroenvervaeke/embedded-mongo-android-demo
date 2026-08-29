@@ -52,7 +52,13 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
      * killed.
      */
     fun retry() {
-        if (preparing.value is Startup.Failed) start()
+        if (preparing.value !is Startup.Failed) return
+        start()
+        // And ask again where the device is. The attempt made during the failed start found no
+        // finder to hand its fix to and stopped, so without this the recovered screen sits on
+        // "Finding you..." with nothing looking -- which is the state this application stopped
+        // tolerating everywhere else.
+        locate()
     }
 
     private fun start() {
@@ -73,8 +79,7 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
     /** Measures from a point tapped on the map, which is the other way to ask "what is near here". */
     fun measureFrom(coordinates: Coordinates) {
         val ready = startup.value as? Startup.Ready ?: return
-        ready.nearby.measureFrom(coordinates)
-        origin.picked()
+        origin.pick(ready.nearby, coordinates)
     }
 
     private suspend fun prepare() {

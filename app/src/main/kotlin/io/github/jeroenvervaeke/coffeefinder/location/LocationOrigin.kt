@@ -1,6 +1,7 @@
 package io.github.jeroenvervaeke.coffeefinder.location
 
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyFinder
+import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import kotlin.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -55,16 +56,26 @@ class LocationOrigin(
                 return@launch
             }
             val finder = nearby() ?: return@launch
-            // A tap on the map during that wait is a choice; a fix that arrives afterwards is not,
-            // and should not quietly replace it while the screen still says the tap is in effect.
-            if (state.value == LocationSource.PICKED) return@launch
             finder.measureFrom(fix.coordinates)
             state.value = fix.source
         }
     }
 
-    /** Records that the origin is now a point the user tapped on the map. */
-    fun picked() {
+    /**
+     * Measures from a point tapped on the map instead, and says so.
+     *
+     * The finder is moved here rather than by the caller, because [LocationSource.PICKED] is a
+     * claim about where the query is measured from and the two must not be able to disagree — the
+     * fallback labelling reads that claim and rewrites the screen on the strength of it.
+     *
+     * Cancelling is how a tap beats a fix that was already on its way. A guard on the state would
+     * not do: it cannot tell a tap that landed during the attempt, which should win, from one made
+     * before the user pressed the location button, which they have just overruled themselves.
+     * Guarding on it left that button dead for the life of the process after any tap.
+     */
+    fun pick(finder: NearbyFinder, coordinates: Coordinates) {
+        attempt?.cancel()
+        finder.measureFrom(coordinates)
         state.value = LocationSource.PICKED
     }
 }

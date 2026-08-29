@@ -130,8 +130,7 @@ class LocationOriginTest {
     fun `a failed retry does not claim Dublin over a point tapped on the map`() = runTest {
         val finder = finder()
         val origin = LocationOrigin(Locator { null }, backgroundScope, BUDGET)
-        finder.measureFrom(GALWAY)
-        origin.picked()
+        origin.pick(finder, GALWAY)
 
         origin.locate { finder }
         settle()
@@ -140,7 +139,7 @@ class LocationOriginTest {
     }
 
     @Test
-    fun `a tap on the map is not overwritten by a fix that arrives after it`() = runTest {
+    fun `a tap on the map calls off a fix that was already on its way`() = runTest {
         val finder = finder()
         val slow = Locator {
             delay(2.seconds)
@@ -149,12 +148,26 @@ class LocationOriginTest {
         val origin = LocationOrigin(slow, backgroundScope, BUDGET)
 
         origin.locate { finder }
-        finder.measureFrom(GALWAY)
-        origin.picked()
+        origin.pick(finder, GALWAY)
         settle()
 
         assertEquals(GALWAY, finder.asked.value.origin)
         assertEquals(LocationSource.PICKED, origin.source.value)
+    }
+
+    @Test
+    fun `the location button still works after a tap on the map`() = runTest {
+        // A tap beats a fix that was already on its way; it does not beat the next press of the
+        // button, which is the user overruling their own tap.
+        val finder = finder()
+        val origin = LocationOrigin(Locator { CORK }, backgroundScope, BUDGET)
+        origin.pick(finder, GALWAY)
+
+        origin.locate { finder }
+        settle()
+
+        assertEquals(CORK, finder.asked.value.origin)
+        assertEquals(LocationSource.DEVICE, origin.source.value)
     }
 
     @Test
