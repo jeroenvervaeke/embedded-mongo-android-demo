@@ -24,10 +24,27 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // The AAR's own abiFilters do not reach the application's. Named here so that no other
-        // native code can produce a 32-bit split -- one that would install and then fail to load
-        // an engine, because MongoDB has no 32-bit build.
-        ndk { abiFilters += setOf("arm64-v8a", "x86_64") }
+    }
+
+    // The engine is about 48 MB per ABI and is stored uncompressed, because minSdk 28 makes
+    // useLegacyPackaging false -- which is right for the device, since an uncompressed library is
+    // mapped rather than extracted. It does mean a universal APK holds both engines, lands near
+    // 97 MB, and makes every arm64 phone carry 48 MB of x86_64 it can never run.
+    //
+    // One APK per ABI instead. An app bundle does the same thing on Play and is what a release
+    // would use; this keeps a sideloaded build honest too. `reset()` first because the default
+    // list is every ABI AGP knows, and this AAR only has two.
+    //
+    // This list is also what keeps a 32-bit split from ever being produced -- one would install
+    // and then fail to load an engine, because MongoDB has no 32-bit build. `defaultConfig.ndk`
+    // would say the same thing, but AGP refuses to have both and rejects the build.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
     }
 
     buildTypes {
