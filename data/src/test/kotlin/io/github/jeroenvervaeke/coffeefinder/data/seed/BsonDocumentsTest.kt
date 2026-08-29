@@ -7,6 +7,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
 import org.bson.Document
 import org.bson.codecs.DocumentCodec
@@ -84,6 +85,18 @@ class BsonDocumentsTest {
         val bogus = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(2).array()
 
         assertFailsWith<EOFException> { bsonDocuments(ByteArrayInputStream(bogus)).toList() }
+    }
+
+    @Test
+    fun `a length of exactly the prefix is refused by the size check, not by running out of bytes`() {
+        // Four bytes is a length that describes only itself. It has to be rejected for being too
+        // small to be a document: a reader that only checked whether the bytes arrived would find
+        // that they all had, and hand four bytes to the BSON decoder.
+        val bogus = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(4).array()
+
+        val refused = assertFailsWith<EOFException> { bsonDocuments(ByteArrayInputStream(bogus)).toList() }
+
+        assertTrue(refused.message!!.contains("declaring 4 bytes"), refused.message!!)
     }
 }
 

@@ -17,9 +17,9 @@ class DistanceExpressionTest {
 
     @Test
     fun `Dublin to Cork comes out at the distance it is`() {
-        // 220.2 km, which is the great-circle distance between these two points on the sphere
-        // MongoDB measures on; the tolerance covers the ellipsoid a survey would use instead.
-        assertEquals(220_230.0, distanceTo(CORK, from = DUBLIN), absoluteTolerance = 500.0)
+        // 220.23 km on the sphere MongoDB measures on. The tolerance is tight on purpose: a
+        // radius that was wrong by even a percent would move this by 2.2 km.
+        assertEquals(220_230.3, distanceTo(CORK, from = DUBLIN), absoluteTolerance = 50.0)
     }
 
     @Test
@@ -38,13 +38,12 @@ class DistanceExpressionTest {
     @Test
     fun `the same sphere is used as geoNear's, so the two are comparable`() {
         // A quarter turn along the equator is a quarter of the circumference, which pins the
-        // radius the expression was built with.
+        // radius the expression was built with. Written out rather than expressed through
+        // EARTH_RADIUS_METRES: the claim is that the constant is MongoDB's own
+        // kRadiusOfEarthInMeters, and a test that names the constant on both sides cannot say so.
         val quarterTurn = distanceTo(Coordinates(90.0, 0.0), from = Coordinates(0.0, 0.0))
 
-        assertTrue(
-            abs(quarterTurn - EARTH_RADIUS_METRES * Math.PI / 2) < 1.0,
-            "a quarter turn measured $quarterTurn m",
-        )
+        assertEquals(6_378_100.0 * Math.PI / 2, quarterTurn, absoluteTolerance = 1.0)
     }
 
     private fun distanceTo(place: Coordinates, from: Coordinates): Double {

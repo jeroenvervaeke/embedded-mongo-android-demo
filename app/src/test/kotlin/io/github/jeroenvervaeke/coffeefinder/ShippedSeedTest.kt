@@ -44,10 +44,23 @@ class ShippedSeedTest {
     }
 
     @Test
-    fun `the seed is a stream of documents rather than one document holding them`() {
-        val first = seed().first()
+    fun `every document carries the fields the application reads, and no others`() {
+        val required = setOf("_id", "name", "cat", "confidence", "loc")
+        val optional = setOf("brand", "addr")
 
-        assertEquals(setOf("_id", "name", "cat", "confidence", "addr", "loc"), first.keys - "brand")
+        val documents = seed()
+        assertEquals(emptyList(), documents.filterNot { it.keys.containsAll(required) }.map { it.keys })
+        assertEquals(emptyList(), documents.filterNot { (required + optional).containsAll(it.keys) }.map { it.keys })
+    }
+
+    @Test
+    fun `the optional fields really are present on some documents and absent on others`() {
+        // Otherwise the test above would pass on a seed where nothing ever carried a brand, and
+        // the parser's handling of a missing one would be unexercised against real data.
+        val documents = seed()
+
+        assertTrue(documents.any { it.containsKey("brand") } && documents.any { !it.containsKey("brand") })
+        assertTrue(documents.any { it.containsKey("addr") } && documents.any { !it.containsKey("addr") })
     }
 
     private fun seed(): List<org.bson.Document> {

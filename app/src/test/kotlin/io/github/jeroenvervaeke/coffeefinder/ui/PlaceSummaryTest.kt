@@ -35,6 +35,15 @@ class PlaceSummaryTest {
     }
 
     @Test
+    fun `a chain branch whose address fields were all empty shows the chain, not a dangling separator`() {
+        // The brand survives, so the outer fallback never runs and only the inner one can stop
+        // an empty address becoming "Insomnia · ".
+        val place = place(brand = "Insomnia", address = Address(region = "CO"))
+
+        assertEquals("Insomnia", place.summary())
+    }
+
+    @Test
     fun `an address holding only a region is not an address worth showing`() {
         // A region on its own ("CO") locates nothing, so the row falls back to the category.
         assertEquals("Coffee shop", place(address = Address(region = "CO")).summary())
