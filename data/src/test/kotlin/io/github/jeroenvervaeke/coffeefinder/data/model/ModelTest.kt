@@ -1,5 +1,6 @@
 package io.github.jeroenvervaeke.coffeefinder.data.model
 
+import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -9,21 +10,27 @@ import kotlin.test.assertTrue
 class MetresTest {
     @Test
     fun `a walk is described in metres`() {
-        assertEquals("450 m", Metres(450.4).describe())
+        assertEquals("450 m", Metres(450.4).describe(Locale.ROOT))
+    }
+
+    @Test
+    fun `the decimal separator is the reader's, because this text goes on screen`() {
+        assertEquals("1.2 km", Metres(1_200.0).describe(Locale.UK))
+        assertEquals("1,2 km", Metres(1_200.0).describe(Locale.FRANCE))
     }
 
     @Test
     fun `a kilometre and beyond is described in kilometres`() {
-        assertEquals("1.0 km", Metres(1000.0).describe())
-        assertEquals("12.3 km", Metres(12_345.0).describe())
+        assertEquals("1.0 km", Metres(1000.0).describe(Locale.ROOT))
+        assertEquals("12.3 km", Metres(12_345.0).describe(Locale.ROOT))
     }
 
     @Test
     fun `a distance just under a kilometre is not rounded into a metre count no one writes`() {
         // Rounds to 1000 metres, which has to be read as a kilometre rather than printed as
         // "1000 m".
-        assertEquals("1.0 km", Metres(999.6).describe())
-        assertEquals("999 m", Metres(999.4).describe())
+        assertEquals("1.0 km", Metres(999.6).describe(Locale.ROOT))
+        assertEquals("999 m", Metres(999.4).describe(Locale.ROOT))
     }
 
     @Test
@@ -51,6 +58,16 @@ class ViewportTest {
 
         assertTrue(Coordinates(-6.2603, 53.3498) in viewport)
         assertTrue(Coordinates(-2.0, 53.3498) !in viewport)
+    }
+
+    @Test
+    fun `both corners are inside, because the bounds are closed at each end`() {
+        val viewport = Viewport(west = -10.0, south = 51.0, east = -5.0, north = 55.0)
+
+        // The map queries the box it is showing; a place exactly on the north or east edge is
+        // drawn, so it has to count as inside.
+        assertTrue(Coordinates(-10.0, 51.0) in viewport)
+        assertTrue(Coordinates(-5.0, 55.0) in viewport)
     }
 
     @Test

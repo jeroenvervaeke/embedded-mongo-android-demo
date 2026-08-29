@@ -18,16 +18,19 @@ value class Metres(val value: Double) {
 
     /**
      * How this distance reads to a person: metres up to a kilometre, then kilometres to one
-     * decimal. [Locale.ROOT] because the separator belongs to the caller's formatting, not to a
-     * value that also ends up in logs and tests.
+     * decimal.
+     *
+     * In [locale], defaulting to the device's, because the only thing that calls this puts the
+     * result on screen — and a reader in France writes 1,2 km rather than 1.2 km. Tests pass
+     * [Locale.ROOT] so that what they assert does not depend on the machine running them.
      */
-    fun describe(): String {
+    fun describe(locale: Locale = Locale.getDefault()): String {
         // Rounded before the unit is chosen rather than after: 999.6 m rounds to 1000, and
         // "1000 m" is a distance no one writes.
         val metres = value.roundToInt()
         return when {
             metres < METRES_PER_KILOMETRE -> "$metres m"
-            else -> String.format(Locale.ROOT, "%.1f km", value / METRES_PER_KILOMETRE)
+            else -> String.format(locale, "%.1f km", value / METRES_PER_KILOMETRE)
         }
     }
 
