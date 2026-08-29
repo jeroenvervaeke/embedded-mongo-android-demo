@@ -54,7 +54,7 @@ as on an API 35 x86_64 emulator.
 | `./gradlew :app:lintDebug` | **green**, with `warningsAsErrors` on |
 | `./gradlew :app:assembleDebug` | **84 MB** per ABI (debug stores dex uncompressed) |
 | `./gradlew :app:assembleRelease` | **59 MB** per ABI, R8 on |
-| On arm64 hardware | seeds, indexes, queries, draws, and survives being killed with the engine open |
+| On arm64 hardware | seeds, indexes, queries, draws, gives up on a location that never arrives, and survives being killed with the engine open |
 
 The arm64 APK carries the published `aarch64-linux-android` engine byte for byte — the `.so` in
 `lib/arm64-v8a/` has the SHA-256 the library's `prebuilt.rs` records — and it loads and runs on
@@ -70,7 +70,9 @@ locked phone dozes: `am start` still launches, the log lines still appear, and e
 is wrong, because the big core sits at 864 MHz instead of its 3.36 GHz — measured here as a
 start-up of 5.6 s against 0.67 s for the same build minutes apart. Battery saver does the same
 thing more quietly. Wake **and unlock** the device, and check `dumpsys power | grep mWakefulness`
-says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
+says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it — and check it again part
+way through a long session, because a 30-second screen timeout puts the phone back to `Dozing`
+between one measurement and the next, which is the same wrong number arriving a second time.
 
 - **Cold start is 1.2–2.2 s to a screen of results**, as the system measures it — `reportFullyDrawn`
   fires on the first list, so `Displayed` is the spinner and `Fully drawn` is the real thing. Of
@@ -94,7 +96,9 @@ says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
   is — the pipeline screen prints the coordinates it was handed. Refused, the screen says
   "No location — measured from Dublin" and returns Henry St and O'Connell St at 19–34 m,
   ascending. Refused twice, the permission goes `USER_FIXED` and the button opens this
-  application's page in system settings, which is the only way back. Revoked while running, the
+  application's page in system settings, which is the only way back — but a process killed and
+  restored in that same state reaches the list without opening settings at all, because the
+  settings page is the button's answer and not a cold start's. Revoked while running, the
   platform kills the process; see below.
 - **The fix is not always prompt.** `getCurrentLocation` answered within a few seconds on some
   attempts and not at all on others, twice — on debug and release alike, so it is not R8. The call
@@ -104,6 +108,20 @@ says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
   says "Gave up waiting for a location — measured from Dublin. Tap to try again." — told apart
   from a refusal, because a refusal is answered by granting the permission and a silence by asking
   again. Nothing is held up while it waits: the list is already answering from Dublin.
+  **The silence reproduces on its own**, and was watched doing so three times with the permission
+  granted, location services on and no aeroplane mode — the conditions the original hang was seen
+  in. Each time the screen turned over at ten seconds with the Dublin list still under it.
+  **Aeroplane mode is not a way to test this**: it answers *faster*, from a cached fix, because it
+  takes the network away and not the cache. The silence has to be waited for rather than arranged.
+- **Giving up drops the request, and `dumpsys location` is the wrong place to look.** The fused
+  provider attributes an application's request to `com.google.android.gms` and marks it
+  `hiddenFromAppOps`, so this package never appears there and the obvious investigation dead-ends.
+  The channel that shows it is the app op: `adb shell cmd appops get <package>` reports
+  `MONITOR_LOCATION` as `(running)` from the moment the button is pressed, and on three separate
+  attempts it stopped with `duration=` 9.976 s, 9.999 s and 9.997 s. Cancelling a coroutine tells
+  Play services nothing by itself, and the request carries `durationMillis = Long.MAX_VALUE`, so
+  something ended it at the budget — that the something was the `CancellationToken` is the one
+  step here that is inferred rather than seen.
 - **One `$geoWithin` returns all 5,180**, and plotting them draws a recognisable Ireland.
 - **Killed with the engine open** — revoking a runtime permission makes the platform kill the
   process, which is a real SIGKILL mid-flight — it reopened with exactly 5,180 places, no repair
@@ -111,27 +129,41 @@ says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
 - **Killed 0.4 s into seeding**, before any marker was written, it dropped the partial collection
   on relaunch and came back with exactly 5,180. That one is still an emulator result; the phone
   was interrupted with the database open rather than mid-seed.
-- **R8 keeps what it must.** The release build seeds, queries, renders `Document.toJson` on the
-  pipeline screen and reads the licence assets, on the library's `consumer-rules.pro` alone —
-  this application adds no rule of its own.
+- **R8 keeps what it must, on no rule of this application's own.** The release build seeds,
+  queries, renders `Document.toJson` on the pipeline screen and reads the licence assets on the
+  library's `consumer-rules.pro` alone. Built with the old duplicate rule restored and built
+  without it, R8 produces the same `seeds.txt`, the same `usage.txt`, the same `mapping.txt` and a
+  byte-identical APK — so removing it changed nothing R8 keeps or drops, and the numbers above
+  describe the build that ships.
 
 ### Still unverified
 
 - **Nothing has run on a small or nearly full volume.** The free-disk floor was only ever
   observed passing: `getAllocatableBytes` answered 151,694,327,808 bytes on a 460 GB partition
   against the 64 MiB asked for, so the check is nowhere near its boundary and the refusal path
-  has not been exercised on a device.
+  has not been exercised on a device. A failed start is what that refusal produces, so the retry
+  that recovers from one — which asks the device where it is a second time — has not been seen on
+  a phone either; it is proven on the JVM and nowhere else.
 - **The device was in one place.** `$geoNear` from a real fix was measured in Dublin, so a fix
   outside the seed's bounding box has not been seen.
-- **The location fixes were made by reading, not on a device.** The hang they close was seen on
-  the phone, twice; none of what replaced it has been. The budget expiring, the location button
-  after a tap on the map, a retry after a failed start, and a process restored between a second
-  permission refusal and a launch are proven on the JVM — every one of those tests was watched
-  failing against the code it replaced — but no phone has been observed in any of the four.
-- **No APK built without this application's own R8 rule has been on a phone.** The rule that came
-  out was a duplicate of one the library already ships, so it changed nothing R8 keeps or drops,
-  and `:app:assembleRelease` was watched succeeding without it — but the hardware run above was
-  made with the duplicate still there.
+- **Three details of the location work were not observed, though the behaviour around each was.**
+  The screen was watched turning over to "Gave up waiting" from "No location" rather than from
+  "Finding you…" — both are states whose query really is on Dublin and both take the same branch,
+  but the literal `ASKING` → timed-out transition is not the one that was watched. The transient
+  "Finding you…" label was never caught on screen at all: a `uiautomator` dump costs about two
+  seconds and a fix now lands faster than that. And after an `am kill`, whether `asked` came back
+  `true` or came back `false` and was re-denied under `USER_FIXED` cannot be told apart from
+  outside the process — both reach `locate()`, and neither opens settings, which is the whole of
+  what that fix claims.
+- **The release APK has only ever been debug-signed.** There is no release `signingConfig`, so
+  `assembleRelease` produces an unsigned APK and every hardware run above was made with one signed
+  by the standard debug keystore. The code is unaffected — it is the byte-identical R8 output
+  described above, and `dumpsys package` reports `flags=0x0`, so nothing here was measured on a
+  debuggable build. Only the certificate differs, which leaves everything gated on it untested:
+  Play App Signing's re-signing, key rotation, v4 install, signature-level permissions, and Play
+  Integrity attestation. This application declares one permission and makes no network call, so
+  nothing in it reads its own signature — but that is a reading of the manifest, not something a
+  device showed.
 - **32-bit and Android 9–13 remain untested.** One arm64 phone on API 36 is one phone.
 
 ## Layout
@@ -295,5 +327,12 @@ from the library's own `consumer-rules.pro`. That last one used to be duplicated
 dangling reference; the library has since taken it over, so this build now requires a library
 checkout at `808276e` or later. Against an older one the release build fails outright on
 `Missing class org.slf4j.Logger`.
+
+Two things make that easy to check wrongly, if you re-run the comparison that established it.
+R8 emits `seeds.txt` unordered, so a plain `diff` of two runs reports thousands of differences
+that are not there — sort it first, or compare `mapping.txt` and the APK instead. And the Gradle
+build cache will satisfy `minifyReleaseWithR8` `FROM-CACHE` from an entry keyed on a different
+library checkout, which makes a stale artefact look like a passing comparison: build both sides
+with `--no-build-cache`, and check the task actually ran rather than trusting `BUILD SUCCESSFUL`.
 
 [library]: https://github.com/jeroenvervaeke/embedded-mongo
