@@ -6,6 +6,7 @@ import io.github.jeroenvervaeke.embeddedmongodb.StorageOptions
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
@@ -52,6 +53,9 @@ class CoffeeDatabase(
         Unit
     }
 
+    // getCompletionExceptionOrNull is the only way to ask a Deferred whether it *failed* rather
+    // than merely finished, and it is still marked experimental.
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun database(): OpenDatabase {
         val opening = lock.withLock {
             starting ?: scope.async { opener.open(directory, COFFEE_STORAGE) }.also { starting = it }
@@ -59,11 +63,14 @@ class CoffeeDatabase(
         return try {
             opening.await()
         } catch (failure: Throwable) {
-            // A *caller* that was cancelled leaves the open running for whoever asks next, so the
-            // result is still worth keeping. An open that actually failed must not be: remembered,
-            // it would be the answer every later screen got, and the application could never try
-            // again. NonCancellable because the caller is usually already cancelled by here.
-            if (opening.isCompleted) {
+            // Only an open that actually failed is forgotten. `isCompleted` is not that question:
+            // it is also true of an open that *succeeded* and whose caller merely lost the race to
+            // a cancellation, and forgetting one of those strands a running engine nobody holds --
+            // the next open is refused as a second runtime, and every screen fails until the
+            // process dies. NonCancellable because the caller is usually already cancelled here.
+            // Both halves are needed: getCompletionExceptionOrNull throws on a job still in
+            // flight, which is exactly the state a cancelled caller leaves behind.
+            if (opening.isCompleted && opening.getCompletionExceptionOrNull() != null) {
                 withContext(NonCancellable) { lock.withLock { if (starting === opening) starting = null } }
             }
             throw failure
@@ -86,10 +93,12 @@ const val COFFEE_DIRECTORY = "coffee"
  * 10.25 MiB with its journal, so a phone with 400 MB free could open the database and never
  * finish seeding it — `createIndexes` failing with `OutOfDiskSpace` on every launch.
  *
- * 64 MiB is about six times the finished directory and roughly two and a half times the transient
- * peak while the indexes are being built, which is the shape the library asks for: lower it to
- * what the work about to be done actually needs, not to what will fit. It is deliberately not
- * lower. The floor is a pre-flight check and the only warning there is — nothing stops a build
+ * 64 MiB is about six times that, which is the shape the library asks for: lower it to what the
+ * work about to be done actually needs, not to what will fit. It is deliberately not lower.
+ *
+ * The 10.25 MiB is the library's own figure for an Ireland-scale directory, quoted rather than
+ * measured here — no engine has run against this application yet. It is the right order and the
+ * margin is generous, but the number to trust is one taken from this database once it exists. The floor is a pre-flight check and the only warning there is — nothing stops a build
  * that runs out part-way, and WiredTiger answers a genuinely full disk by aborting the process,
  * with no exception to catch. The margin is the whole of the protection.
  *

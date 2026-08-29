@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.android.application)
@@ -84,6 +85,13 @@ kotlin {
         jvmTarget = JvmTarget.JVM_17
         allWarningsAsErrors = true
     }
+}
+
+// The virtual-time controls in kotlinx-coroutines-test are still marked experimental, and the
+// engine lifecycle tests step over cancellation with them. Opted in for the tests only, so
+// production code still has to say so at the call site.
+tasks.matching { it.name.endsWith("UnitTestKotlin") }.configureEach {
+    (this as KotlinCompile).compilerOptions.optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi")
 }
 
 // ShippedAssetsTest reads what the asset merger produced rather than what the source tree holds,

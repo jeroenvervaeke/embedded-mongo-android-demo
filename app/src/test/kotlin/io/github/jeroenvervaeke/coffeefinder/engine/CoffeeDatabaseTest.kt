@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.job
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -74,6 +75,10 @@ class CoffeeDatabaseTest {
             opener.started.await()
 
             screen.cancel()
+            // Let the cancelled caller run its failure path before asking again. Without this the
+            // catch has not been scheduled yet, and the test passes whatever that path does --
+            // which is how a bug that cleared the cached open on success survived it.
+            runCurrent()
             opener.finish()
             val next = database.seam()
 
