@@ -88,19 +88,20 @@ const val COFFEE_DIRECTORY = "coffee"
  * The one storage limit this application knows better than the library does.
  *
  * MongoDB will not start an index build with less than 500 MB free, and this application's cold
- * start is a bulk insert followed by two index builds. That default is sized for a server: an
- * Ireland-scale directory here holds about 2.25 MiB of documents and indexes and occupies about
- * 10.25 MiB with its journal, so a phone with 400 MB free could open the database and never
- * finish seeding it — `createIndexes` failing with `OutOfDiskSpace` on every launch.
+ * start is a bulk insert followed by two index builds. That default is sized for a server. The
+ * whole directory here measures 10.4 MiB on a device — 1.5 MB of documents, 0.7 MB across three
+ * indexes, and an 8 MiB journal — so at the default a phone with 400 MB free could open the
+ * database and never finish seeding it, failing `createIndexes` with `OutOfDiskSpace` on every
+ * launch.
  *
  * 64 MiB is about six times that, which is the shape the library asks for: lower it to what the
- * work about to be done actually needs, not to what will fit. It is deliberately not lower.
+ * work about to be done actually needs, not to what will fit. It is deliberately not lower. The
+ * floor is a pre-flight check and the only warning there is — nothing stops a build that runs out
+ * part-way, and WiredTiger answers a genuinely full disk by aborting the process, with no
+ * exception to catch. The margin is the whole of the protection.
  *
- * The 10.25 MiB is the library's own figure for an Ireland-scale directory, quoted rather than
- * measured here — no engine has run against this application yet. It is the right order and the
- * margin is generous, but the number to trust is one taken from this database once it exists. The floor is a pre-flight check and the only warning there is — nothing stops a build
- * that runs out part-way, and WiredTiger answers a genuinely full disk by aborting the process,
- * with no exception to catch. The margin is the whole of the protection.
+ * Measured rather than quoted: `du -sk files/coffee` on an API 35 emulator after a full seed and
+ * both index builds reports 10,700 KB, and seeding completes in about two seconds at this floor.
  *
  * Naming it also lowers the check the library makes before the engine is opened at all, from
  * 256 MiB to this, which is the intended pairing: an application that says 64 MiB is enough

@@ -41,30 +41,39 @@ concatenated BSON, gzipped to 454 KB, produced by the library's `scripts/build-p
 extension is `.gzip` rather than the `.gz` that script writes, and that matters — see "Things
 worth knowing".
 
-## What is built, and what is not
+## What is built, and what runs
 
-The library's published engine prebuilts predate a change to its native inputs, so its freshness
-gate refuses to link an AAR from this checkout and a release is being published. Everything that
-does not need the native library is written and verified; everything that does is written and
-has never been run.
+It runs. Built against the published engine (`native-81be76197da4`) with no override, installed on
+an API 35 x86_64 emulator, and driven end to end.
 
 | | |
 | --- | --- |
-| `./gradlew :data:test` | **runs, green.** 138 tests, no Android SDK needed |
-| `./gradlew :app:testDebugUnitTest` | **runs, green.** 31 tests — the real seed, the packaged assets, and the engine's lifecycle against a fake opener |
-| `./gradlew :app:compileDebugKotlin` | **compiles**, against the real library classes |
-| `./gradlew :app:compileReleaseKotlin` | **compiles** |
-| `./gradlew :app:assembleDebug`, `:app:lintDebug` | **blocked**: both need `cargoJniLibs` |
+| `./gradlew :data:test` | **green.** 138 tests, no Android SDK needed |
+| `./gradlew :app:testDebugUnitTest` | **green.** 31 tests — the real seed, the packaged assets, the engine lifecycle |
+| `./gradlew :app:lintDebug` | **green**, with `warningsAsErrors` on |
+| `./gradlew :app:assembleDebug` | **84 MB** per ABI (debug stores dex uncompressed) |
+| `./gradlew :app:assembleRelease` | **59 MB** per ABI, R8 on |
+| On device | seeds, indexes, queries, draws, and survives being killed mid-seed |
 
-No device or emulator has run any of this. The seeding, the engine seam and every screen are
-written and unexercised — no engine has ever answered one of these pipelines.
+What the device showed:
 
-What *is* checked against reality rather than against a fake: `ShippedSeedTest` reads the seed
-through the same stream reader and parser the application uses, and asserts that all 5,180
-documents parse, that every place is inside the extent the seed was extracted with, and that
-every category in it is one the application knows. `ShippedAssetsTest` goes one step further and
-reads what AGP's asset merger actually produced, because the packaged assets are not the same
-files as the source tree's.
+- **Cold start is about two seconds** — 5,180 documents inserted in journalled batches, a
+  `2dsphere` and a text index built, and the first `$geoNear` rendered. A background WiredTiger
+  checkpoint follows about a minute later and is not on the path to a usable screen.
+- **The database measures 10.4 MiB**: 1.5 MB of documents, 0.7 MB across three indexes, 8 MiB of
+  journal. The 64 MiB free-disk floor is about six times that, and index builds succeed at it.
+- **`$geoNear` from the Dublin fallback** returns Henry St and O'Connell St at 19–34 m, ascending.
+- **`$text` agrees with `$geoNear` to the metre** on the same place, which is what naming the same
+  sphere for the haversine was for.
+- **One `$geoWithin` returns all 5,180**, paged over `getMore`, and plotting them draws a
+  recognisable Ireland — Belfast, Dublin, Cork, Galway, and the coast road.
+- **Killed 0.4 s into seeding** — before any marker was written — it dropped the partial
+  collection on relaunch and came back with exactly 5,180.
+- **R8 keeps what it must.** The release build seeds, queries, renders `Document.toJson` on the
+  pipeline screen and reads the licence assets, on the library's `consumer-rules.pro` alone.
+
+Still unverified: only x86_64 has run. The arm64 APK is built but has never been on a phone, and
+every timing here is an emulator sharing a host with three others, not a device.
 
 ## Layout
 
@@ -173,12 +182,13 @@ the shipped file would be `places/ireland.bson`, decompressed, and every launch 
 actually produced rather than what the source tree holds, which is the only place that is
 visible.
 
-**One APK per ABI.** The engine is about 48 MB per architecture and is stored uncompressed,
-which is right for the device — an uncompressed library is mapped rather than unpacked — but a
-universal APK would hold both engines, land near 97 MB against Play's 100 MB ceiling, and make
-every arm64 phone carry 48 MB of x86_64 it can never run. `splits { abi { … } }` builds one APK
-per ABI; a release would use an app bundle for the same reason. That `include` list is also what
-stops a 32-bit split ever being produced, since MongoDB has no 32-bit build.
+**One APK per ABI.** The engine is 46 MB per architecture and is stored uncompressed, which is
+right for the device — an uncompressed library is mapped rather than unpacked — but a universal
+APK would hold both engines and make every arm64 phone carry 46 MB of x86_64 it can never run.
+`splits { abi { … } }` builds one APK per ABI; a release would use an app bundle for the same
+reason. Split, a release APK measures 59 MB: engine 46 MB, `libc++_shared` 8.8 MB, and 2.2 MB of
+dex after R8. That `include` list is also what stops a 32-bit split ever being produced, since
+MongoDB has no 32-bit build.
 
 **Places are counted with `$count`, not `{count: …}`.** The metadata count is the one operation
 this project has measured going wrong after an unclean shutdown — and Android killing the process
@@ -210,5 +220,11 @@ export ANDROID_HOME=/path/to/Android/Sdk
 ./gradlew :app:testDebugUnitTest
 ./gradlew :app:assembleDebug             # needs the library's engine to link
 ```
+
+**R8 needs one rule of its own.** `org.mongodb:bson` carries `org.bson.diagnostics.SLF4JLogger`,
+which references SLF4J that nothing here puts on the classpath. The class is unreachable, but R8
+refuses to finish with a dangling reference, so `app/proguard-rules.pro` carries
+`-dontwarn org.slf4j.**`. `bson` is an `api` dependency of the library, so every consumer that
+minifies will hit this.
 
 [library]: https://github.com/jeroenvervaeke/embedded-mongo

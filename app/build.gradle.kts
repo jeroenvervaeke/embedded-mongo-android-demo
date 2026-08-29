@@ -93,6 +93,15 @@ android {
             "AndroidGradlePluginVersion",
             "NewerVersionAvailable",
             "GradleDependency",
+            // Wants targetSdk at the newest API. targetSdk cannot exceed compileSdk, compileSdk
+            // is 36 because AGP 8.13.2 will not go higher, and that AGP is the library's -- a
+            // composite build compiles both with one of them. Not actionable from this side.
+            "OldTargetApi",
+            // Says the v26 on res/mipmap-anydpi-v26 is redundant at minSdk 28. Following that
+            // advice breaks the build: renamed to mipmap-anydpi, AGP creates the auto-versioned
+            // mipmap-anydpi-v26 output folder and copies nothing into it, and aapt then fails
+            // with "resource mipmap/ic_launcher not found". Verified on a clean build.
+            "ObsoleteSdkInt",
         )
     }
 }
