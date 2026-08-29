@@ -36,8 +36,10 @@ licence the data is under can be read inside the application.
 `app/src/main/assets/places/ireland.attribution.txt` records the extraction and every
 modification made to the data, and `licenses/SOURCES` records where each text was fetched from.
 
-The seed itself is `app/src/main/assets/places/ireland.bson.gz`: 5,180 documents of concatenated
-BSON, gzipped to 454 KB, produced by the library's `scripts/build-places-seed`.
+The seed itself is `app/src/main/assets/places/ireland.bson.gzip`: 5,180 documents of
+concatenated BSON, gzipped to 454 KB, produced by the library's `scripts/build-places-seed`. The
+extension is `.gzip` rather than the `.gz` that script writes, and that matters — see "Things
+worth knowing".
 
 ## What is built, and what is not
 
@@ -48,8 +50,8 @@ has never been run.
 
 | | |
 | --- | --- |
-| `./gradlew :data:test` | **runs, green.** 134 tests, no Android SDK needed |
-| `./gradlew :app:testDebugUnitTest` | **runs, green.** 29 tests — the real seed, the packaged assets, and the engine's lifecycle against a fake opener |
+| `./gradlew :data:test` | **runs, green.** 138 tests, no Android SDK needed |
+| `./gradlew :app:testDebugUnitTest` | **runs, green.** 31 tests — the real seed, the packaged assets, and the engine's lifecycle against a fake opener |
 | `./gradlew :app:compileDebugKotlin` | **compiles**, against the real library classes |
 | `./gradlew :app:compileReleaseKotlin` | **compiles** |
 | `./gradlew :app:assembleDebug`, `:app:lintDebug` | **blocked**: both need `cargoJniLibs` |
@@ -170,6 +172,18 @@ the shipped file would be `places/ireland.bson`, decompressed, and every launch 
 `FileNotFoundException` for a name that is not there. `ShippedAssetsTest` reads what the merger
 actually produced rather than what the source tree holds, which is the only place that is
 visible.
+
+**One APK per ABI.** The engine is about 48 MB per architecture and is stored uncompressed,
+which is right for the device — an uncompressed library is mapped rather than unpacked — but a
+universal APK would hold both engines, land near 97 MB against Play's 100 MB ceiling, and make
+every arm64 phone carry 48 MB of x86_64 it can never run. `splits { abi { … } }` builds one APK
+per ABI; a release would use an app bundle for the same reason. That `include` list is also what
+stops a 32-bit split ever being produced, since MongoDB has no 32-bit build.
+
+**Places are counted with `$count`, not `{count: …}`.** The metadata count is the one operation
+this project has measured going wrong after an unclean shutdown — and Android killing the process
+mid-seed is exactly that. Seeding compares its marker against this number, so it walks the
+collection instead.
 
 **`:data` is a plain JVM module, so Android Lint never checks it for platform API levels.** Its
 tests run on a JDK where everything exists. Anything it calls has to exist on API 28 — which
