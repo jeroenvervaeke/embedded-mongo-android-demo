@@ -50,7 +50,7 @@ as on an API 35 x86_64 emulator.
 | | |
 | --- | --- |
 | `./gradlew :data:test` | **green.** 140 tests, no Android SDK needed |
-| `./gradlew :app:testDebugUnitTest` | **green.** 55 tests — the real seed, the packaged assets, the engine lifecycle, the location budget, the timings |
+| `./gradlew :app:testDebugUnitTest` | **green.** 57 tests — the real seed, the packaged assets, the engine lifecycle, the location budget, the timings |
 | `./gradlew :app:lintDebug` | **green**, with `warningsAsErrors` on |
 | `./gradlew :app:assembleDebug` | **84 MB** per ABI (debug stores dex uncompressed) |
 | `./gradlew :app:assembleRelease` | **59 MB** per ABI, R8 on |

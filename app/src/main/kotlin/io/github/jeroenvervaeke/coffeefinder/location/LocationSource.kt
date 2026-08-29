@@ -22,5 +22,19 @@ enum class LocationSource {
     TIMED_OUT,
 
     /** The user tapped the map, which overrides wherever the device thinks it is. */
-    PICKED,
+    PICKED;
+
+    /**
+     * Whether a query in this state really is measured from Dublin.
+     *
+     * What makes it safe to relabel the screen after an attempt that produced no fix. An attempt
+     * that fails once a fix or a tap has landed leaves that origin in place, so saying "measured
+     * from Dublin" over it would be a lie the reader has no way to check.
+     *
+     * A `when` rather than a set of equalities, so a new state has to decide which it is.
+     */
+    val measuresFromDublin: Boolean get() = when (this) {
+        ASKING, FALLBACK, TIMED_OUT -> true
+        DEVICE, PICKED -> false
+    }
 }

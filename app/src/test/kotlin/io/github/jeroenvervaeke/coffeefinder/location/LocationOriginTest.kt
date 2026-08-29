@@ -3,6 +3,7 @@ package io.github.jeroenvervaeke.coffeefinder.location
 import io.github.jeroenvervaeke.coffeefinder.data.MongoSeam
 import io.github.jeroenvervaeke.coffeefinder.data.PlaceRepository
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyFinder
+import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -112,6 +113,33 @@ class LocationOriginTest {
     }
 
     @Test
+    fun `a failed retry does not claim Dublin over a fix already in effect`() = runTest {
+        val finder = finder()
+        val origin = LocationOrigin(ScriptedLocator(listOf(fix(CORK), fix(null))), backgroundScope, BUDGET)
+        origin.locate { finder }
+        settle()
+
+        origin.locate { finder }
+        settle()
+
+        assertEquals(LocationSource.DEVICE, origin.source.value)
+        assertEquals(CORK, finder.asked.value.origin)
+    }
+
+    @Test
+    fun `a failed retry does not claim Dublin over a point tapped on the map`() = runTest {
+        val finder = finder()
+        val origin = LocationOrigin(Locator { null }, backgroundScope, BUDGET)
+        finder.measureFrom(GALWAY)
+        origin.picked()
+
+        origin.locate { finder }
+        settle()
+
+        assertEquals(LocationSource.PICKED, origin.source.value)
+    }
+
+    @Test
     fun `a tap on the map is not overwritten by a fix that arrives after it`() = runTest {
         val finder = finder()
         val slow = Locator {
@@ -147,8 +175,11 @@ class LocationOriginTest {
      * second, if the ask that superseded it had not called it off.
      */
     private fun slowThenPrompt() = ScriptedLocator(
-        listOf(Answer(after = 3.seconds, where = CORK), Answer(after = Duration.ZERO, where = GALWAY)),
+        listOf(Answer(after = 3.seconds, where = CORK), fix(GALWAY)),
     )
+
+    /** An answer that arrives at once, which is every ask whose timing is not the point. */
+    private fun fix(where: Coordinates?) = Answer(after = Duration.ZERO, where = where)
 
     private fun TestScope.finder(mongo: MongoSeam = CountingSeam()) =
         NearbyFinder(PlaceRepository(mongo, StandardTestDispatcher(testScheduler)), backgroundScope)

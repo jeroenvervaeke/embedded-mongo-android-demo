@@ -48,7 +48,10 @@ class LocationOrigin(
         attempt = scope.launch {
             val fix = locator.fixWithin(budget)
             if (fix !is LocationFix.Known) {
-                state.value = fix.source
+                // Only a screen whose query really is on Dublin may be told it is on Dublin. The
+                // button is pressed again after a fix has landed as well as before one has, and
+                // a failure then changes nothing about where the list is measured from.
+                if (state.value.measuresFromDublin) state.value = fix.source
                 return@launch
             }
             val finder = nearby() ?: return@launch
