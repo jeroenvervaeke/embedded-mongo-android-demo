@@ -13,9 +13,9 @@ import io.github.jeroenvervaeke.coffeefinder.data.query.searchCommand
 import io.github.jeroenvervaeke.coffeefinder.data.query.viewportCommand
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.withContext
 import org.bson.Document
 
 /**
@@ -31,9 +31,12 @@ data class Queried<T>(val results: List<T>, val command: Document)
  * The three questions this application asks about coffee places.
  *
  * [decodeOn] is where replies are turned into [io.github.jeroenvervaeke.coffeefinder.data.model.Place]s.
- * It matters: the seam's flow is already `flowOn` the engine's own thread, but without this the
- * mapping would run wherever the *collector* is, which on Android is the main thread — six
- * thousand documents of BSON parsed on it for every settled pan of the map.
+ * It matters: without it the parsing runs wherever the *collector* is, which on Android is the
+ * main thread — six thousand documents of BSON on it for every settled pan of the map.
+ *
+ * `withContext` rather than `flowOn`, and the difference is the whole point: `flowOn` moves the
+ * upstream, while the terminal `toList` still resumes in the caller's context. Both finders
+ * collect from `stateIn(viewModelScope, …)`, so that context is `Main.immediate`.
  */
 class PlaceRepository(
     private val mongo: MongoSeam,
@@ -60,5 +63,5 @@ class PlaceRepository(
         run(viewportCommand(viewport, limit), Document::toPlace)
 
     private suspend fun <T> run(command: Document, read: (Document) -> T): Queried<T> =
-        Queried(mongo.documents(command).map(read).flowOn(decodeOn).toList(), command)
+        withContext(decodeOn) { Queried(mongo.documents(command).map(read).toList(), command) }
 }
