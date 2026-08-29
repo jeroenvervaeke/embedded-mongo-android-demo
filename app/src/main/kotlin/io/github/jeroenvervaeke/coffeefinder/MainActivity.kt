@@ -49,8 +49,8 @@ class MainActivity : ComponentActivity() {
         val permission = rememberLauncherForActivityResult(RequestPermission()) { model.locate() }
         var asked by rememberSaveable { mutableStateOf(false) }
 
-        val request: () -> Unit = remember(model) {
-            {
+        val ask: (Boolean) -> Unit = remember(model) {
+            { mayOpenSettings ->
                 when {
                     model.hasLocationPermission() -> model.locate()
                     !asked || shouldShowRequestPermissionRationale(LOCATION) -> {
@@ -60,14 +60,21 @@ class MainActivity : ComponentActivity() {
                     // Refused for good: the system will not show the dialog again, so the only
                     // way back is the settings screen. Without this the button does nothing at
                     // all, for the life of the install.
-                    else -> openApplicationSettings()
+                    mayOpenSettings -> openApplicationSettings()
+                    // The same state, reached by nobody asking. Opening system settings the user
+                    // did not ask to see is a strange way to start an application, and leaving it
+                    // at that is worse: the screen would sit on "Finding you…" with nothing
+                    // looking. Say what is true instead — there is no permission, so it is Dublin.
+                    else -> model.locate()
                 }
             }
         }
+        val request: () -> Unit = remember(ask) { { ask(true) } }
 
-        // `asked` survives a process death and the ViewModel does not, so a restored process that
-        // already holds the permission has to reach `locate` some other way. This is that way.
-        LaunchedEffect(Unit) { request() }
+        // Runs once on a cold start, and has to: `asked` survives a process death and the
+        // ViewModel does not, so a restored process reaches `locate` no other way — whether it
+        // already holds the permission or will never hold it.
+        LaunchedEffect(Unit) { ask(false) }
         return request
     }
 

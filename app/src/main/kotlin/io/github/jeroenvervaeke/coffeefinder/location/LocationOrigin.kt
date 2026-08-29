@@ -17,6 +17,10 @@ import kotlinx.coroutines.launch
  * back is given up on, that giving up says so instead of claiming the device has no location, that
  * a second ask cannot be overtaken by the first — is testable on the JVM with virtual time, and an
  * `AndroidViewModel` is not.
+ *
+ * Not thread-safe, and does not need to be: [locate] and [pick] are called from the UI thread and
+ * [scope] is the one the screen runs in, so nothing here can interleave with the attempt it
+ * launched. A scope on a dispatcher with more than one thread would need locking that is not here.
  */
 class LocationOrigin(
     private val locator: Locator,

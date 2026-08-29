@@ -57,7 +57,9 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
         // And ask again where the device is. The attempt made during the failed start found no
         // finder to hand its fix to and stopped, so without this the recovered screen sits on
         // "Finding you..." with nothing looking -- which is the state this application stopped
-        // tolerating everywhere else.
+        // tolerating everywhere else. After start() rather than before it: the new attempt waits
+        // for the startup to stop saying Preparing, and ahead of start() it would read the
+        // failure this retry is undoing and give up on it.
         locate()
     }
 
