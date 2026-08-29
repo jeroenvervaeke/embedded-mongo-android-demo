@@ -43,37 +43,83 @@ worth knowing".
 
 ## What is built, and what runs
 
-It runs. Built against the published engine (`native-81be76197da4`) with no override, installed on
-an API 35 x86_64 emulator, and driven end to end.
+It runs, on a phone. Built against the published engine (`native-81be76197da4`) with no override,
+and driven end to end on a **Galaxy S23 Ultra (SM-S918B, arm64-v8a, Android 16 / API 36)** as well
+as on an API 35 x86_64 emulator.
 
 | | |
 | --- | --- |
-| `./gradlew :data:test` | **green.** 138 tests, no Android SDK needed |
-| `./gradlew :app:testDebugUnitTest` | **green.** 31 tests — the real seed, the packaged assets, the engine lifecycle |
+| `./gradlew :data:test` | **green.** 140 tests, no Android SDK needed |
+| `./gradlew :app:testDebugUnitTest` | **green.** 41 tests — the real seed, the packaged assets, the engine lifecycle, the timings |
 | `./gradlew :app:lintDebug` | **green**, with `warningsAsErrors` on |
 | `./gradlew :app:assembleDebug` | **84 MB** per ABI (debug stores dex uncompressed) |
 | `./gradlew :app:assembleRelease` | **59 MB** per ABI, R8 on |
-| On device | seeds, indexes, queries, draws, and survives being killed mid-seed |
+| On arm64 hardware | seeds, indexes, queries, draws, and survives being killed with the engine open |
 
-What the device showed:
+The arm64 APK carries the published `aarch64-linux-android` engine byte for byte — the `.so` in
+`lib/arm64-v8a/` has the SHA-256 the library's `prebuilt.rs` records — and it loads and runs on
+the phone with nothing about it patched for the architecture.
 
-- **Cold start is about two seconds** — 5,180 documents inserted in journalled batches, a
-  `2dsphere` and a text index built, and the first `$geoNear` rendered. A background WiredTiger
-  checkpoint follows about a minute later and is not on the path to a usable screen.
-- **The database measures 10.4 MiB**: 1.5 MB of documents, 0.7 MB across three indexes, 8 MiB of
-  journal. The 64 MiB free-disk floor is about six times that, and index builds succeed at it.
-- **`$geoNear` from the Dublin fallback** returns Henry St and O'Connell St at 19–34 m, ascending.
-- **`$text` agrees with `$geoNear` to the metre** on the same place, which is what naming the same
-  sphere for the haversine was for.
-- **One `$geoWithin` returns all 5,180**, paged over `getMore`, and plotting them draws a
-  recognisable Ireland — Belfast, Dublin, Cork, Galway, and the coast road.
-- **Killed 0.4 s into seeding** — before any marker was written — it dropped the partial
-  collection on relaunch and came back with exactly 5,180.
+### What the phone showed
+
+Numbers below are the **release build**, five runs each, screen on and battery saver off. The
+application prints them itself: `adb logcat -s CoffeeTimings`.
+
+Both conditions are load-bearing, and neither is obvious when driving a phone over `adb`. A
+locked phone dozes: `am start` still launches, the log lines still appear, and every one of them
+is wrong, because the big core sits at 864 MHz instead of its 3.36 GHz — measured here as a
+start-up of 5.6 s against 0.67 s for the same build minutes apart. Battery saver does the same
+thing more quietly. Wake **and unlock** the device, and check `dumpsys power | grep mWakefulness`
+says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
+
+- **Cold start is 1.2–2.2 s to a screen of results**, as the system measures it — `reportFullyDrawn`
+  fires on the first list, so `Displayed` is the spinner and `Fully drawn` is the real thing. Of
+  that, opening the engine is 0.3–1.2 s, inserting 5,180 documents is 220–305 ms, and the two
+  index builds are 79–107 ms together. **Opening the engine is the largest and by far the most
+  variable part** — it is a 48 MB shared library being mapped, and it dominates a cold start far
+  more than the seed does.
+- **A warm start is 1.4–1.5 s**, of which the database is 440–490 ms. Nothing is re-seeded: the
+  place count is read back and matches.
+- **A settled pan costs 33 ms at the median and 75 ms at the worst**, over 40 pans. Asking for
+  the whole island — every one of the 5,180 documents returned, paged over `getMore` and parsed
+  into domain objects — is 51–75 ms. That work is off the main thread, and the canvas keeps
+  drawing from the live camera while it runs, so a pan never waits on it.
+- **Minify it or the numbers change.** The debug build is 2–3× slower on exactly these paths:
+  950 ms to insert against 250 ms, and a 5,180-document pan at 136 ms against 63 ms. A
+  measurement from a debug build is not a measurement of the application.
+- **The database measures 10.3 MiB** on the device: 1.5 MB of documents, 0.7 MB across four
+  indexes, and an 8 MiB journal — within a rounding error of what the emulator reported.
+- **All four states of the location permission behave**, each driven from a wiped install.
+  Granted, FusedLocationProvider answers and `$geoNear` measures from where the phone actually
+  is — the pipeline screen prints the coordinates it was handed. Refused, the screen says
+  "No location — measured from Dublin" and returns Henry St and O'Connell St at 19–34 m,
+  ascending. Refused twice, the permission goes `USER_FIXED` and the button opens this
+  application's page in system settings, which is the only way back. Revoked while running, the
+  platform kills the process; see below.
+- **The fix is not always prompt.** `getCurrentLocation` answered within a few seconds on some
+  attempts and not at all on others, and the screen then sits on "Finding you…" — there is no
+  timeout on that call, so a provider that never calls back leaves it there. The button retries
+  and recovers it. Seen on debug and release alike, so it is not R8.
+- **One `$geoWithin` returns all 5,180**, and plotting them draws a recognisable Ireland.
+- **Killed with the engine open** — revoking a runtime permission makes the platform kill the
+  process, which is a real SIGKILL mid-flight — it reopened with exactly 5,180 places, no repair
+  and no reseed, in 466 ms.
+- **Killed 0.4 s into seeding**, before any marker was written, it dropped the partial collection
+  on relaunch and came back with exactly 5,180. That one is still an emulator result; the phone
+  was interrupted with the database open rather than mid-seed.
 - **R8 keeps what it must.** The release build seeds, queries, renders `Document.toJson` on the
-  pipeline screen and reads the licence assets, on the library's `consumer-rules.pro` alone.
+  pipeline screen and reads the licence assets, on the library's `consumer-rules.pro` plus the
+  one rule below — which the library has since taken over, see "Building".
 
-Still unverified: only x86_64 has run. The arm64 APK is built but has never been on a phone, and
-every timing here is an emulator sharing a host with three others, not a device.
+### Still unverified
+
+- **Nothing has run on a small or nearly full volume.** The free-disk floor was only ever
+  observed passing: `getAllocatableBytes` answered 151,694,327,808 bytes on a 460 GB partition
+  against the 64 MiB asked for, so the check is nowhere near its boundary and the refusal path
+  has not been exercised on a device.
+- **The device was in one place.** `$geoNear` from a real fix was measured in Dublin, so a fix
+  outside the seed's bounding box has not been seen.
+- **32-bit and Android 9–13 remain untested.** One arm64 phone on API 36 is one phone.
 
 ## Layout
 
@@ -161,8 +207,8 @@ database rather than a migrated one. From API 31 that attribute only covers clou
 than 500 MB free, and this application's cold start is a bulk insert followed by two index
 builds — so at the default a phone with 400 MB free could open the database and never finish
 seeding it. The library keeps 500 MB for every caller and lets one that knows better say so:
-an Ireland-scale directory here is about 10.25 MiB with its journal, and 64 MiB is roughly six
-times that. It is deliberately not lower. Nothing stops a build that runs out part-way —
+an Ireland-scale directory here is 10.3 MiB with its journal, measured on the phone, and 64 MiB
+is roughly six times that. It is deliberately not lower. Nothing stops a build that runs out part-way —
 WiredTiger answers a genuinely full disk by aborting the process, with nothing to catch — so the
 floor is the only warning there is and the margin is the whole of the protection. Naming it also
 lowers the library's pre-open check from 256 MiB to match.
@@ -189,6 +235,13 @@ APK would hold both engines and make every arm64 phone carry 46 MB of x86_64 it 
 reason. Split, a release APK measures 59 MB: engine 46 MB, `libc++_shared` 8.8 MB, and 2.2 MB of
 dex after R8. That `include` list is also what stops a 32-bit split ever being produced, since
 MongoDB has no 32-bit build.
+
+**The application times itself.** Every finished query and every phase of a start-up is one
+`Log.i` line under the `CoffeeTimings` tag, so `adb logcat -s CoffeeTimings` is the whole
+measuring apparatus and the numbers above can be re-taken on any device. The most recent one is
+also on screen — under the map, and beside each command on the pipeline screen — because a pan
+latency is worth seeing next to the pan. `reportFullyDrawn` covers the end a log line cannot:
+process start and dex loading, which the system measures for itself and prints as `Fully drawn`.
 
 **Places are counted with `$count`, not `{count: …}`.** The metadata count is the one operation
 this project has measured going wrong after an unclean shutdown — and Android killing the process
@@ -221,10 +274,14 @@ export ANDROID_HOME=/path/to/Android/Sdk
 ./gradlew :app:assembleDebug             # needs the library's engine to link
 ```
 
-**R8 needs one rule of its own.** `org.mongodb:bson` carries `org.bson.diagnostics.SLF4JLogger`,
-which references SLF4J that nothing here puts on the classpath. The class is unreachable, but R8
-refuses to finish with a dangling reference, so `app/proguard-rules.pro` carries
-`-dontwarn org.slf4j.**`. `bson` is an `api` dependency of the library, so every consumer that
-minifies will hit this.
+**R8 needs one rule that is on its way out.** `org.mongodb:bson` carries
+`org.bson.diagnostics.SLF4JLogger`, which references SLF4J that nothing here puts on the
+classpath. The class is unreachable, but R8 refuses to finish with a dangling reference, so
+`app/proguard-rules.pro` carries `-dontwarn org.slf4j.**`. `bson` is an `api` dependency of the
+library, so every consumer that minifies hits this — and the library now ships that rule in its
+own `consumer-rules.pro`. Verified both ways: against a library checkout without it the release
+build fails on `Missing class org.slf4j.Logger`, and against one with it the build succeeds with
+the rule here deleted. It is kept only so that this application still builds against a checkout
+older than that, and should go when there is a reason to require a newer one.
 
 [library]: https://github.com/jeroenvervaeke/embedded-mongo

@@ -9,6 +9,8 @@
 #
 #   Missing class org.slf4j.Logger (referenced from: org.bson.diagnostics.SLF4JLogger.delegate)
 #
-# This is not app-specific. `bson` is an api dependency of embedded-mongodb, so any consumer that
-# turns on minification hits it; the library's own consumer-rules.pro would be the better home.
+# This is not app-specific -- bson is an api dependency of embedded-mongodb, so any consumer that
+# minifies hits it -- and the library now carries this rule in its own consumer-rules.pro. Kept
+# here only so this application still builds against a library checkout from before that landed;
+# a duplicate -dontwarn costs nothing. Delete it once there is a reason to require the newer one.
 -dontwarn org.slf4j.**

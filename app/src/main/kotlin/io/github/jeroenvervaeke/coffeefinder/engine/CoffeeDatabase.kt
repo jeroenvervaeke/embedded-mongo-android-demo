@@ -89,7 +89,7 @@ const val COFFEE_DIRECTORY = "coffee"
  *
  * MongoDB will not start an index build with less than 500 MB free, and this application's cold
  * start is a bulk insert followed by two index builds. That default is sized for a server. The
- * whole directory here measures 10.4 MiB on a device — 1.5 MB of documents, 0.7 MB across three
+ * whole directory here measures 10.3 MiB on a phone — 1.5 MB of documents, 0.7 MB across four
  * indexes, and an 8 MiB journal — so at the default a phone with 400 MB free could open the
  * database and never finish seeding it, failing `createIndexes` with `OutOfDiskSpace` on every
  * launch.
@@ -100,8 +100,9 @@ const val COFFEE_DIRECTORY = "coffee"
  * part-way, and WiredTiger answers a genuinely full disk by aborting the process, with no
  * exception to catch. The margin is the whole of the protection.
  *
- * Measured rather than quoted: `du -sk files/coffee` on an API 35 emulator after a full seed and
- * both index builds reports 10,700 KB, and seeding completes in about two seconds at this floor.
+ * Measured rather than quoted: `du -sk files/coffee` on a Galaxy S23 Ultra after a full seed and
+ * both index builds reports 10,562 KB, and the seed and both index builds take about 330 ms
+ * together at this floor.
  *
  * Naming it also lowers the check the library makes before the engine is opened at all, from
  * 256 MiB to this, which is the intended pairing: an application that says 64 MiB is enough
