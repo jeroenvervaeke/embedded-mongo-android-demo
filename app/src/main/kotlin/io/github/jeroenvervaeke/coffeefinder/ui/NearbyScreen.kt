@@ -135,6 +135,8 @@ private fun Origin(source: LocationSource, onLocate: () -> Unit) {
                 LocationSource.ASKING -> "Finding you…"
                 LocationSource.DEVICE -> "Measured from your location"
                 LocationSource.FALLBACK -> "No location — measured from Dublin"
+                LocationSource.TIMED_OUT ->
+                    "Gave up waiting for a location — measured from Dublin. Tap to try again."
                 LocationSource.PICKED -> "Measured from the point you tapped on the map"
             },
             style = MaterialTheme.typography.bodySmall,

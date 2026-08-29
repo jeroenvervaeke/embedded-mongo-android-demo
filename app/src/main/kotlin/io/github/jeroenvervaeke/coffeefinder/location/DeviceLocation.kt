@@ -12,42 +12,28 @@ import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-/** Why a query is being measured from where it is, which is worth saying on screen. */
-enum class LocationSource {
-    /** No answer yet — the permission has not been decided, or the fix has not arrived. */
-    ASKING,
-
-    /** The device said where it is. */
-    DEVICE,
-
-    /** It would not, so the queries measure from Dublin. */
-    FALLBACK,
-
-    /** The user tapped the map, which overrides wherever the device thinks it is. */
-    PICKED,
-}
-
 /**
- * Where the device is, or `null` when it will not say.
- *
- * `null` covers every way that happens — permission refused, location switched off, no fix yet,
- * no Play services — because they all lead to the same place: measure from Dublin and say so.
- * There is nothing here worth telling the four of them apart for.
+ * The device's own answer to where it is, straight from Play services and with no bound on how
+ * long it takes. [fixWithin] is what puts a bound on it.
  *
  * The `MissingPermission` suppression is on the one call that needs the permission, which
  * [isPermitted] has just checked and lint cannot see through. Revocation between the two is a
  * real race, and it is the `SecurityException` the `catch` is there for.
  */
-class DeviceLocation(private val context: Context) {
+class DeviceLocation(private val context: Context) : Locator {
     fun isPermitted(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
 
     @SuppressLint("MissingPermission")
-    suspend fun current(): Coordinates? {
+    override suspend fun fix(): Coordinates? {
         if (!isPermitted()) return null
         val cancellation = CancellationTokenSource()
         return suspendCancellableCoroutine { continuation ->
+            // What makes giving up cost nothing. The caller's timeout cancels this coroutine and
+            // lands here, and Play services then drops a request that was still holding the
+            // radios open for a fix nobody is waiting for any more. A late answer resumes a dead
+            // continuation, which is discarded rather than delivered.
             continuation.invokeOnCancellation { cancellation.cancel() }
             // Both calls can throw before any listener is attached -- no Play services on the
             // device, or the permission revoked in the moment between the check above and here.

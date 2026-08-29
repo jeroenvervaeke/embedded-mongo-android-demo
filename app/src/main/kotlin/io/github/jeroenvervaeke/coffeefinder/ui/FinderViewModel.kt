@@ -14,6 +14,7 @@ import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.seed.SeedProgress
 import io.github.jeroenvervaeke.coffeefinder.data.seed.Seeder
 import io.github.jeroenvervaeke.coffeefinder.location.DeviceLocation
+import io.github.jeroenvervaeke.coffeefinder.location.LocationOrigin
 import io.github.jeroenvervaeke.coffeefinder.location.LocationSource
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,13 +31,13 @@ import kotlinx.coroutines.launch
  */
 class FinderViewModel(application: Application) : AndroidViewModel(application) {
     private val deviceLocation = DeviceLocation(application)
+    private val origin = LocationOrigin(deviceLocation, viewModelScope)
     private val preparing = MutableStateFlow<Startup>(Startup.Preparing(SeedProgress.Checking))
-    private val source = MutableStateFlow(LocationSource.ASKING)
 
     val startup: StateFlow<Startup> get() = preparing
 
     /** Why the list is measured from where it is, which the screen says out loud. */
-    val locationSource: StateFlow<LocationSource> get() = source
+    val locationSource: StateFlow<LocationSource> get() = origin.source
 
     init {
         start()
@@ -59,27 +60,11 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { prepare() }
     }
 
-    /**
-     * Asks the device where it is and measures from there.
-     *
-     * Called once the location permission has been decided, whichever way: a refusal is what puts
-     * the screen on Dublin, and it should say so as soon as it knows.
-     */
-    fun locate() = viewModelScope.launch {
-        val here = deviceLocation.current()
-        if (here == null) {
-            source.value = LocationSource.FALLBACK
-            return@launch
-        }
-        // On a cold start the fix usually arrives before the seed has finished going in, so this
-        // waits for the finders. It waits for a failure too: awaiting Ready alone would leave a
+    /** Asks the device where it is. What that means is [LocationOrigin]'s. */
+    fun locate() = origin.locate {
+        // Waits for a failure as well as for a success: awaiting Ready alone would leave a
         // coroutine suspended for the life of the ViewModel on a database that never opened.
-        val ready = startup.first { it !is Startup.Preparing } as? Startup.Ready ?: return@launch
-        // A tap on the map during that wait is a choice; a fix that arrives afterwards is not,
-        // and should not quietly replace it while the screen still says the tap is in effect.
-        if (source.value == LocationSource.PICKED) return@launch
-        ready.nearby.measureFrom(here)
-        source.value = LocationSource.DEVICE
+        (startup.first { it !is Startup.Preparing } as? Startup.Ready)?.nearby
     }
 
     /** Whether the location permission is already granted, which decides whether to ask for it. */
@@ -89,7 +74,7 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
     fun measureFrom(coordinates: Coordinates) {
         val ready = startup.value as? Startup.Ready ?: return
         ready.nearby.measureFrom(coordinates)
-        source.value = LocationSource.PICKED
+        origin.picked()
     }
 
     private suspend fun prepare() {

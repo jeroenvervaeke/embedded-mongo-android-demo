@@ -49,7 +49,6 @@ class MainActivity : ComponentActivity() {
         val permission = rememberLauncherForActivityResult(RequestPermission()) { model.locate() }
         var asked by rememberSaveable { mutableStateOf(false) }
 
-        // Typed, because the branches answer with a Job, a Unit and a Unit.
         val request: () -> Unit = remember(model) {
             {
                 when {
@@ -63,7 +62,6 @@ class MainActivity : ComponentActivity() {
                     // all, for the life of the install.
                     else -> openApplicationSettings()
                 }
-                Unit
             }
         }
 

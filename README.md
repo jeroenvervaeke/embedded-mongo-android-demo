@@ -50,7 +50,7 @@ as on an API 35 x86_64 emulator.
 | | |
 | --- | --- |
 | `./gradlew :data:test` | **green.** 140 tests, no Android SDK needed |
-| `./gradlew :app:testDebugUnitTest` | **green.** 41 tests — the real seed, the packaged assets, the engine lifecycle, the timings |
+| `./gradlew :app:testDebugUnitTest` | **green.** 55 tests — the real seed, the packaged assets, the engine lifecycle, the location budget, the timings |
 | `./gradlew :app:lintDebug` | **green**, with `warningsAsErrors` on |
 | `./gradlew :app:assembleDebug` | **84 MB** per ABI (debug stores dex uncompressed) |
 | `./gradlew :app:assembleRelease` | **59 MB** per ABI, R8 on |
@@ -97,9 +97,13 @@ says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
   application's page in system settings, which is the only way back. Revoked while running, the
   platform kills the process; see below.
 - **The fix is not always prompt.** `getCurrentLocation` answered within a few seconds on some
-  attempts and not at all on others, and the screen then sits on "Finding you…" — there is no
-  timeout on that call, so a provider that never calls back leaves it there. The button retries
-  and recovers it. Seen on debug and release alike, so it is not R8.
+  attempts and not at all on others, twice — on debug and release alike, so it is not R8. The call
+  has no bound of its own: the `CurrentLocationRequest` its priority-only overload builds leaves
+  `durationMillis` at `Long.MAX_VALUE`, so a provider that never calls back left the screen on
+  "Finding you…" for the life of the process. It now waits ten seconds, cancels the request, and
+  says "Gave up waiting for a location — measured from Dublin. Tap to try again." — told apart
+  from a refusal, because a refusal is answered by granting the permission and a silence by asking
+  again. Nothing is held up while it waits: the list is already answering from Dublin.
 - **One `$geoWithin` returns all 5,180**, and plotting them draws a recognisable Ireland.
 - **Killed with the engine open** — revoking a runtime permission makes the platform kill the
   process, which is a real SIGKILL mid-flight — it reopened with exactly 5,180 places, no repair
@@ -119,6 +123,10 @@ says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it.
   has not been exercised on a device.
 - **The device was in one place.** `$geoNear` from a real fix was measured in Dublin, so a fix
   outside the seed's bounding box has not been seen.
+- **The ten-second budget has not been seen expiring on a device.** The hang it exists for was,
+  twice, before there was one. What replaced it is proven on the JVM against a provider that never
+  calls back — and the test was watched failing with the timeout taken out — but no phone has yet
+  been observed reaching the end of the budget and saying so.
 - **32-bit and Android 9–13 remain untested.** One arm64 phone on API 36 is one phone.
 
 ## Layout
@@ -136,7 +144,7 @@ data/                       plain Kotlin: no Android, no embedded-mongodb
 
 app/                        the Android shell
   engine/                   EmbeddedMongoSeam -- the whole of the native contact
-  location/                 FusedLocationProvider, with Dublin as the fallback
+  location/                 FusedLocationProvider, a budget on waiting, and Dublin as the fallback
   ui/                       Compose: list, map, pipeline, about
   assets/places/            the seed, its attribution, and the licence texts it must ship with
                             (named .gzip, not .gz -- see "Things worth knowing")
