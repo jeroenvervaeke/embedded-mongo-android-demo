@@ -2,7 +2,9 @@ package io.github.jeroenvervaeke.coffeefinder.location
 
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyFinder
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
+import io.github.jeroenvervaeke.coffeefinder.ui.logLocation
 import kotlin.time.Duration
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +28,10 @@ class LocationOrigin(
     private val locator: Locator,
     private val scope: CoroutineScope,
     private val budget: Duration = LOCATION_BUDGET,
+    /** Where the outcome of an attempt is reported. See [logLocation]. */
+    private val report: (String, Duration) -> Unit = ::logLocation,
+    /** The clock the attempt is measured against, injected for the same reason the finders' is. */
+    private val clock: TimeSource = TimeSource.Monotonic,
 ) {
     private val state = MutableStateFlow(LocationSource.ASKING)
     private var attempt: Job? = null
@@ -51,7 +57,9 @@ class LocationOrigin(
         // a second query to do it.
         attempt?.cancel()
         attempt = scope.launch {
+            val started = clock.markNow()
             val fix = locator.fixWithin(budget)
+            report(fix.describe(), started.elapsedNow())
             if (fix !is LocationFix.Known) {
                 // Only a screen whose query really is on Dublin may be told it is on Dublin. The
                 // button is pressed again after a fix has landed as well as before one has, and
@@ -82,4 +90,11 @@ class LocationOrigin(
         finder.measureFrom(coordinates)
         state.value = LocationSource.PICKED
     }
+}
+
+/** What to call this outcome in a log line. */
+private fun LocationFix.describe(): String = when (this) {
+    is LocationFix.Known -> "fixed at ${coordinates.longitude}, ${coordinates.latitude}"
+    LocationFix.Unavailable -> "the device does not know where it is"
+    LocationFix.GaveUp -> "gave up waiting"
 }
