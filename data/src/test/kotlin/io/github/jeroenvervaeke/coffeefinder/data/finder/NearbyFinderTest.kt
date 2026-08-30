@@ -82,7 +82,7 @@ class NearbyFinderTest {
 
         assertEquals(
             listOf(-8.4756, 51.8985),
-            (mongo.lastCommand.stage("\$geoNear")["near"] as Document)["coordinates"],
+            (mongo.lastCommand.pipeline().stage("\$geoNear")["near"] as Document)["coordinates"],
         )
     }
 
@@ -94,7 +94,7 @@ class NearbyFinderTest {
         finder.filterBy(PlaceCategory.COFFEE_ROASTERY)
         settle()
 
-        assertEquals(Document("cat", "coffee_roastery"), mongo.lastCommand.stage("\$geoNear")["query"])
+        assertEquals(Document("cat", "coffee_roastery"), mongo.lastCommand.pipeline().stage("\$geoNear")["query"])
     }
 
     @Test
@@ -105,7 +105,7 @@ class NearbyFinderTest {
         finder.limitTo(Metres.ofKilometres(5.0))
         settle()
 
-        assertEquals(5000.0, mongo.lastCommand.stage("\$geoNear")["maxDistance"])
+        assertEquals(5000.0, mongo.lastCommand.pipeline().stage("\$geoNear")["maxDistance"])
     }
 
     @Test
@@ -130,7 +130,7 @@ class NearbyFinderTest {
         finder.limitTo(null)
         settle()
 
-        assertFalse(mongo.lastCommand.stage("\$geoNear").containsKey("maxDistance"))
+        assertFalse(mongo.lastCommand.pipeline().stage("\$geoNear").containsKey("maxDistance"))
     }
 
     @Test

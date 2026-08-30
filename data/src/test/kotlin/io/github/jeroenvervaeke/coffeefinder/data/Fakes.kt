@@ -2,26 +2,34 @@ package io.github.jeroenvervaeke.coffeefinder.data
 
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
+import io.github.jeroenvervaeke.coffeefinder.data.query.COFFEE_DATABASE
+import io.github.jeroenvervaeke.coffeefinder.data.query.PLACES_COLLECTION
+import io.github.jeroenvervaeke.coffeefinder.data.query.places
+import io.github.jeroenvervaeke.coffeefinder.data.query.seedMarkers
+import io.github.jeroenvervaeke.embeddedmongodb.CommandRunner
+import io.github.jeroenvervaeke.embeddedmongodb.MongoDatabase
 import java.util.concurrent.Executors
 import kotlin.time.Duration
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import org.bson.Document
 
 /**
- * A [MongoSeam] that answers from Kotlin and records what it was asked.
+ * A [CommandRunner] that answers from Kotlin and records what it was asked.
  *
- * The same shape as the library's own `FakeEngine`, one level up: there the seam is BSON bytes,
- * here it is the commands this application sends. Everything above it — pipelines, parsing,
- * seeding, screen state — is therefore testable with no engine at all.
+ * The same seam the library's own tests use, one level up: there it stands in for the JNI bridge,
+ * here for the whole engine. Everything above it — pipelines, parsing, seeding, screen state — is
+ * therefore testable with no engine at all.
+ *
+ * [queryResults] answers the commands that open a cursor, wrapped in the reply shape the engine
+ * uses, and [commandReply] answers the rest. An insert is answered with the `n` a real engine
+ * reports, because the library checks it.
  */
 class FakeMongo(
-    private val commandReply: (Document) -> Document = { okReply() },
+    private val commandReply: (Document) -> Document = ::insertAware,
     private val queryResults: (Document) -> List<Document> = { emptyList() },
     /**
      * How long the engine takes to answer, for the tests that measure that.
@@ -30,7 +38,7 @@ class FakeMongo(
      * time at all -- which is what lets a test assert an exact duration.
      */
     private val answersIn: Duration = Duration.ZERO,
-) : MongoSeam {
+) : CommandRunner {
     private val issued = mutableListOf<Document>()
     private val ran = mutableListOf<String>()
 
@@ -38,23 +46,52 @@ class FakeMongo(
 
     val lastCommand: Document get() = issued.last()
 
-    /** The threads the seam was used on, which is how "not on the caller's thread" is checked. */
+    /** The threads the engine was reached on, which is how "not on the caller's thread" is checked. */
     val threads: List<String> get() = ran
 
-    override suspend fun command(command: Document): Document {
+    /** The database every query in this application goes through, and the two collections in it. */
+    val database = MongoDatabase(this, COFFEE_DATABASE)
+
+    val places = database.places()
+
+    val markers = database.seedMarkers()
+
+    override suspend fun runCommand(database: String, command: Document): Document {
         issued += command
         ran += Thread.currentThread().name
         delay(answersIn)
-        return commandReply(command)
+        return if (command.opensCursor()) cursorReply(command) else commandReply(command)
     }
 
-    override fun documents(command: Document): Flow<Document> = flow {
-        issued += command
-        ran += Thread.currentThread().name
-        delay(answersIn)
-        queryResults(command).forEach { emit(it) }
-    }
+    private fun cursorReply(command: Document): Document = okReply(
+        "cursor" to Document("id", EXHAUSTED)
+            .append("ns", "$COFFEE_DATABASE.${command.collection()}")
+            .append("firstBatch", queryResults(command)),
+    )
 }
+
+/** The engine reports a cursor holding nothing more as id 0, which is every reply this fake gives. */
+private const val EXHAUSTED = 0L
+
+/** The commands whose reply is a cursor rather than a result. */
+private fun Document.opensCursor(): Boolean =
+    keys.first() in setOf("aggregate", "find", "listIndexes", "listCollections")
+
+/** The collection a command names, which is the value of its first field. */
+private fun Document.collection(): String = values.first() as? String ?: PLACES_COLLECTION
+
+/**
+ * The default reply: `ok`, plus the `n` an insert is expected to carry.
+ *
+ * Without the count the library would report every insert as having stored fewer documents than
+ * it was given, which is a check worth having and not one worth restating in every test.
+ */
+private fun insertAware(command: Document): Document =
+    if (command.containsKey("insert")) {
+        okReply("n" to (command["documents"] as List<*>).size)
+    } else {
+        okReply()
+    }
 
 fun okReply(vararg fields: Pair<String, Any?>): Document =
     Document("ok", 1.0).also { reply -> fields.forEach { (key, value) -> reply[key] = value } }
@@ -77,15 +114,15 @@ fun placeDocument(
     .also { document -> address?.let { document.append("addr", it) } }
     .append("loc", Document("type", "Point").append("coordinates", listOf(longitude, latitude)))
 
-/** The stages of an `aggregate` command, which is what most of these tests are asserting about. */
+/** The stages of an `aggregate` command, which is what the library built around a pipeline. */
 fun Document.pipeline(): List<Document> {
     @Suppress("UNCHECKED_CAST")
     return this["pipeline"] as List<Document>
 }
 
 /** The first stage carrying [name]. First rather than only: a pipeline can hold two `$match`es. */
-fun Document.stage(name: String): Document =
-    pipeline().first { it.containsKey(name) }.get(name) as Document
+fun List<Document>.stage(name: String): Document =
+    first { it.containsKey(name) }.get(name) as Document
 
 /** The same Dublin the application falls back to, not a second copy of its coordinates. */
 val DUBLIN = Ireland.DUBLIN
@@ -107,4 +144,5 @@ fun namedDispatcher(name: String): ExecutorCoroutineDispatcher =
  * Without this the finders' debounces would be advancing virtual time while the decoding ran on
  * real threads, which is how a suite starts failing one run in fifty.
  */
-fun TestScope.placesIn(mongo: MongoSeam) = PlaceRepository(mongo, StandardTestDispatcher(testScheduler))
+fun TestScope.placesIn(mongo: FakeMongo) =
+    PlaceRepository(mongo.places, StandardTestDispatcher(testScheduler))

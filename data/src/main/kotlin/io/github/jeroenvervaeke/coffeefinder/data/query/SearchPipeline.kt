@@ -17,13 +17,13 @@ import org.bson.Document
  * the question a person standing in a street is asking, and a chain's branches are all equally
  * good matches for its name.
  */
-fun searchCommand(
+fun searchPipeline(
     text: String,
     from: Coordinates,
     limit: Int,
     category: PlaceCategory? = null,
     maxDistance: Metres? = null,
-): Document {
+): List<Document> {
     require(text.isNotBlank()) { "an empty search matches every document rather than none" }
     require(limit > 0) { "asking for $limit places returns nothing" }
 
@@ -40,5 +40,5 @@ fun searchCommand(
     pipeline += Document("\$sort", Document(DISTANCE_FIELD, 1))
     pipeline += Document("\$limit", limit)
 
-    return aggregate(pipeline)
+    return pipeline
 }

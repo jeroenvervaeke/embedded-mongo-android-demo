@@ -11,6 +11,8 @@ import io.github.jeroenvervaeke.coffeefinder.data.finder.MapState
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyFinder
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyState
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
+import io.github.jeroenvervaeke.coffeefinder.data.query.places
+import io.github.jeroenvervaeke.coffeefinder.data.query.seedMarkers
 import io.github.jeroenvervaeke.coffeefinder.data.seed.SeedProgress
 import io.github.jeroenvervaeke.coffeefinder.data.seed.Seeder
 import io.github.jeroenvervaeke.coffeefinder.location.DeviceLocation
@@ -89,13 +91,14 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
             // Constructed before the database is asked for, so that opening the engine is inside
             // what it measures rather than in front of it.
             val startup = StartupTimer()
-            val mongo = getApplication<CoffeeFinderApplication>().database.seam()
-            Seeder(mongo).seed { getApplication<Application>().assets.open(SEED_ASSET) }
+            val mongo = getApplication<CoffeeFinderApplication>().database.mongo()
+            Seeder(mongo.places(), mongo.seedMarkers())
+                .seed { getApplication<Application>().assets.open(SEED_ASSET) }
                 .collect { progress ->
                     preparing.value = Startup.Preparing(progress)
                     startup.reached(progress)
                 }
-            val places = PlaceRepository(mongo)
+            val places = PlaceRepository(mongo.places())
             val ready = Startup.Ready(
                 nearby = NearbyFinder(places, viewModelScope),
                 map = MapFinder(places, viewModelScope),

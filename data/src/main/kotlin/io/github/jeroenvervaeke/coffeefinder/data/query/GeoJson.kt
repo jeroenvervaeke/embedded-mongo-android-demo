@@ -29,9 +29,3 @@ internal fun geoJsonPolygon(viewport: Viewport): Document = Document("type", "Po
             ),
         ),
     )
-
-/** An `aggregate` command over the places collection. The cursor options are the engine's own. */
-internal fun aggregate(pipeline: List<Document>): Document =
-    Document("aggregate", PLACES_COLLECTION)
-        .append("pipeline", pipeline)
-        .append("cursor", Document())

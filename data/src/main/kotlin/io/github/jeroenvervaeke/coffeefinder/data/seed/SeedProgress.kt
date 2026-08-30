@@ -11,11 +11,11 @@ sealed interface SeedProgress {
     data object Checking : SeedProgress
 
     /** [inserted] documents have reached the collection so far. */
-    data class Inserting(val inserted: Int) : SeedProgress
+    data class Inserting(val inserted: Long) : SeedProgress
 
     /** Building the `2dsphere` and text indexes, which happens after the documents are in. */
     data object Indexing : SeedProgress
 
     /** The database holds [places] coffee places and is ready to be queried. */
-    data class Ready(val places: Int) : SeedProgress
+    data class Ready(val places: Long) : SeedProgress
 }

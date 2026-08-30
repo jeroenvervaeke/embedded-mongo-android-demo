@@ -49,7 +49,7 @@ as on an API 35 x86_64 emulator.
 
 | | |
 | --- | --- |
-| `./gradlew :data:test` | **green.** 140 tests, no Android SDK needed |
+| `./gradlew :data:test` | **green.** 140 tests, no emulator and no compiled engine |
 | `./gradlew :app:testDebugUnitTest` | **green.** 58 tests — the real seed, the packaged assets, the engine lifecycle, the location budget, the timings |
 | `./gradlew :app:lintDebug` | **green**, with `warningsAsErrors` on |
 | `./gradlew :app:assembleDebug` | **84 MB** per ABI (debug stores dex uncompressed) |
@@ -138,6 +138,12 @@ between one measurement and the next, which is the same wrong number arriving a 
 
 ### Still unverified
 
+- **The hardware numbers above predate the collection API.** They were taken when `:data` built
+  its own `aggregate`, `insert` and `createIndexes` documents and sent them through a two-method
+  seam; it now builds pipelines and hands them to `MongoCollection`, and the commands that reach
+  the engine are the library's. The commands themselves are the same documents — the pipeline
+  tests pin them field for field, and `Queried.command` is still what was sent — so the figures
+  are expected to hold, but they have not been re-taken on the phone.
 - **Nothing has run on a small or nearly full volume.** The free-disk floor was only ever
   observed passing: `getAllocatableBytes` answered 151,694,327,808 bytes on a 460 GB partition
   against the 64 MiB asked for, so the check is nowhere near its boundary and the refusal path
@@ -169,45 +175,53 @@ between one measurement and the next, which is the same wrong number arriving a 
 ## Layout
 
 ```
-data/                       plain Kotlin: no Android, no embedded-mongodb
-  MongoSeam.kt              the one interface the engine is reached through
+data/                       plain Kotlin: no Android, none of the library's native half
   PlaceRepository.kt        the three questions, and the command that answered each
   model/                    Coordinates, Metres, Viewport, Place, PlaceCategory
-  query/                    every pipeline, built as org.bson.Document
+  query/                    every pipeline, and the two collections it runs against
   parse/                    replies into domain types, at one boundary
   seed/                     the gzipped BSON stream, and what puts it in the database
   geo/                      the camera and the projection the canvas draws through
   finder/                   the two screens' state, as StateFlows
 
 app/                        the Android shell
-  engine/                   EmbeddedMongoSeam -- the whole of the native contact
+  engine/                   EmbeddedMongoOpener -- the whole of the native contact
   location/                 FusedLocationProvider, a budget on waiting, and Dublin as the fallback
   ui/                       Compose: list, map, pipeline, about
   assets/places/            the seed, its attribution, and the licence texts it must ship with
                             (named .gzip, not .gz -- see "Things worth knowing")
 ```
 
-## The seam
+## How the data layer talks to MongoDB
 
-Every call into MongoDB goes through `MongoSeam`, which is two methods wide:
+Through the library's collection API, and nothing of its own:
 
 ```kotlin
-interface MongoSeam {
-    suspend fun command(command: Document): Document
-    fun documents(command: Document): Flow<Document>
+class PlaceRepository(private val places: MongoCollection, …) {
+    suspend fun nearest(from: Coordinates, limit: Int, …): Queried<NearbyPlace> {
+        val query = places.aggregate(nearestPipeline(from, limit, …))
+        return Queried(query.asFlow(Document::toNearbyPlace).toList(), query.command())
+    }
 }
 ```
 
-`:data` sits entirely above it and depends on `org.mongodb:bson` and coroutines and nothing else,
+`:data` depends on `embedded-mongodb-core` — the library's Android-free half, which is where
+`MongoDatabase`, `MongoCollection` and the queries on them live. There is no engine in it and no
+Android: every collection is built on the library's `CommandRunner`, one suspending method wide,
 so the pipelines, the parsing, the seeding and the screen state are all tested on the JVM against
-a scripted fake — the same shape the library tests its own cursor paging with. `:app` supplies the
-one implementation that talks to `EmbeddedMongo`, and it is a dozen lines of delegation.
+a scripted one.
 
-That is not an abstraction added for its own sake. It is what let this application be written and
-tested while the engine could not be linked, and it is what makes the engine swappable when the
-release lands: `EmbeddedMongoSeam` forwards commands and `EmbeddedMongoOpener` starts the engine,
-and they are the only two files that name `EmbeddedMongo` at all. `CoffeeDatabase` holds the
-lifecycle around them and no engine type, which is what makes that lifecycle testable.
+What this application still writes for itself is the part that is about coffee places: the
+pipelines (`$geoNear`, `$text` with a haversine, `$geoWithin`), the two index specifications, and
+the parsing of replies into domain types. The `aggregate` and `insert` commands around them, the
+cursor paging, the `_id` generation and the write-result checking are the library's.
+
+`Queried.command` is `AggregateQuery.command()` — the document the library would send, not a
+description of it — which is what the pipeline screen shows.
+
+`:app` names `EmbeddedMongo` in one file, `EmbeddedMongoOpener`, which opens the engine and hands
+back `mongo.getDatabase("coffee")`. `CoffeeDatabase` holds the lifecycle around it and no engine type,
+which is what makes that lifecycle testable.
 
 ## Depending on the library
 
@@ -219,9 +233,14 @@ includeBuild(libraryDir) {
     dependencySubstitution {
         substitute(module("io.github.jeroenvervaeke:embedded-mongodb"))
             .using(project(":embedded-mongodb"))
+        substitute(module("io.github.jeroenvervaeke:embedded-mongodb-core"))
+            .using(project(":embedded-mongodb-core"))
     }
 }
 ```
+
+Two substitutions because the library is two modules: `:app` takes the AAR, and `:data` takes the
+core module alone — plain Kotlin, so nothing in the data layer drags in the SDK or the engine.
 
 An included build rather than a copied module or a checked-in AAR: the library's sources stay in
 their own repository, `:app` sees whatever is checked out there, and there is no copy to go stale.
@@ -230,7 +249,7 @@ module in would drag its `buildSrc` and its version catalog along with it.
 
 The path defaults to `../embedded-mongo/android` and is the `embeddedMongoAndroidDir` Gradle
 property, so the two repositories do not have to be siblings. If it is not there, the build says
-so and `:data` and its tests still run — they do not depend on the library at all.
+so rather than failing several hundred lines of Gradle log later.
 
 Both builds are pinned to the same AGP and Kotlin, because a composite build compiles them with
 one of each. The AndroidX versions are pinned to what AGP 8.13.2 and `compileSdk` 36 accept;
@@ -288,10 +307,11 @@ also on screen — under the map, and beside each command on the pipeline screen
 latency is worth seeing next to the pan. `reportFullyDrawn` covers the end a log line cannot:
 process start and dex loading, which the system measures for itself and prints as `Fully drawn`.
 
-**Places are counted with `$count`, not `{count: …}`.** The metadata count is the one operation
-this project has measured going wrong after an unclean shutdown — and Android killing the process
-mid-seed is exactly that. Seeding compares its marker against this number, so it walks the
-collection instead.
+**Places are counted with `countDocuments`, not `estimatedDocumentCount`.** The library's two
+counts are MongoDB's two: one walks the collection with a `$count`, the other reads collection
+metadata. The metadata count is the one operation this project has measured going wrong after an
+unclean shutdown — and Android killing the process mid-seed is exactly that. Seeding compares its
+marker against this number, so it takes the one that is true.
 
 **`:data` is a plain JVM module, so Android Lint never checks it for platform API levels.** Its
 tests run on a JDK where everything exists. Anything it calls has to exist on API 28 — which
@@ -314,7 +334,7 @@ record, rather than pinning the shape of the BSON.
 export JAVA_HOME=/path/to/jdk21          # Android Studio's bundled runtime qualifies
 export ANDROID_HOME=/path/to/Android/Sdk
 
-./gradlew :data:test                     # no SDK needed for this one
+./gradlew :data:test                     # no emulator and no compiled engine for this one
 ./gradlew :app:testDebugUnitTest
 ./gradlew :app:assembleDebug             # needs the library's engine to link
 ```

@@ -2,7 +2,7 @@ package io.github.jeroenvervaeke.coffeefinder.data
 
 import io.github.jeroenvervaeke.coffeefinder.data.model.PlaceCategory
 import io.github.jeroenvervaeke.coffeefinder.data.model.Viewport
-import io.github.jeroenvervaeke.coffeefinder.data.query.nearestCommand
+import io.github.jeroenvervaeke.coffeefinder.data.query.nearestPipeline
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -17,8 +17,18 @@ class PlaceRepositoryTest {
 
         assertEquals(240.0, found.results.single().distance.value)
         assertEquals("The House Of Pretzels", found.results.single().place.name)
-        assertEquals(nearestCommand(DUBLIN, 5, category = PlaceCategory.CAFE), found.command)
+        assertEquals(nearestPipeline(DUBLIN, 5, category = PlaceCategory.CAFE), found.command.pipeline())
         assertEquals(found.command, mongo.lastCommand)
+    }
+
+    @Test
+    fun `a query goes to the places collection as an aggregate the library built`() = runTest {
+        val mongo = FakeMongo(queryResults = { listOf(placeDocument().append("distance", 12.0)) })
+
+        placesIn(mongo).search("pretzels", DUBLIN, limit = 5)
+
+        assertEquals(listOf("aggregate", "pipeline", "cursor"), mongo.lastCommand.keys.toList())
+        assertEquals("places", mongo.lastCommand["aggregate"])
     }
 
     @Test
@@ -27,7 +37,10 @@ class PlaceRepositoryTest {
 
         val found = placesIn(mongo).search("pretzels", DUBLIN, limit = 5)
 
-        assertEquals(listOf("aggregate", "pipeline", "cursor"), mongo.lastCommand.keys.toList())
+        assertEquals(
+            "\$text",
+            (found.command.pipeline().first()["\$match"] as Map<*, *>).keys.single(),
+        )
         assertEquals("The House Of Pretzels", found.results.single().place.name)
     }
 
@@ -49,7 +62,7 @@ class PlaceRepositoryTest {
         try {
             val mongo = FakeMongo(queryResults = { listOf(placeDocument().append("distance", 1.0)) })
 
-            PlaceRepository(mongo, decoder).nearest(DUBLIN, limit = 5)
+            PlaceRepository(mongo.places, decoder).nearest(DUBLIN, limit = 5)
 
             // The coroutine debugger appends its own suffix to the thread name.
             assertTrue(mongo.threads.single().startsWith("decoder"), "ran on ${mongo.threads}")

@@ -1,14 +1,12 @@
 package io.github.jeroenvervaeke.coffeefinder.data.seed
 
-import io.github.jeroenvervaeke.coffeefinder.data.MongoSeam
-import io.github.jeroenvervaeke.coffeefinder.data.query.COUNT_FIELD
-import io.github.jeroenvervaeke.coffeefinder.data.query.countPlacesCommand
-import io.github.jeroenvervaeke.coffeefinder.data.query.createIndexesCommand
-import io.github.jeroenvervaeke.coffeefinder.data.query.dropPlacesCommand
-import io.github.jeroenvervaeke.coffeefinder.data.query.dropSeedMarkerCommand
-import io.github.jeroenvervaeke.coffeefinder.data.query.findSeedMarkerCommand
-import io.github.jeroenvervaeke.coffeefinder.data.query.insertPlacesCommand
-import io.github.jeroenvervaeke.coffeefinder.data.query.writeSeedMarkerCommand
+import io.github.jeroenvervaeke.coffeefinder.data.query.placeIndexes
+import io.github.jeroenvervaeke.embeddedmongodb.MongoCollection
+import io.github.jeroenvervaeke.embeddedmongodb.countDocuments
+import io.github.jeroenvervaeke.embeddedmongodb.createIndexes
+import io.github.jeroenvervaeke.embeddedmongodb.drop
+import io.github.jeroenvervaeke.embeddedmongodb.insertMany
+import io.github.jeroenvervaeke.embeddedmongodb.insertOne
 import java.io.IOException
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
@@ -16,9 +14,12 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import org.bson.Document
+
+/** The `_id` of the one document that records a finished seed. */
+const val SEED_MARKER_ID = "places"
 
 /**
  * Puts the shipped coffee places into the database, once, and keeps the indexes in place.
@@ -28,7 +29,8 @@ import kotlinx.coroutines.flow.flow
  * not. Everything it emits is a [SeedProgress], because on a cold start this is the screen.
  */
 class Seeder(
-    private val mongo: MongoSeam,
+    private val places: MongoCollection,
+    private val markers: MongoCollection,
     private val batchSize: Int = DEFAULT_BATCH_SIZE,
     private val readOn: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -56,37 +58,43 @@ class Seeder(
         emit(SeedProgress.Checking)
 
         val recorded = recordedCount()
-        val stored = countPlaces()
+        // Counted by reading the documents rather than from collection metadata: after an unclean
+        // shutdown -- which is what Android killing the process mid-seed is -- the metadata count
+        // has been measured reading 0 against about 90,000 stored documents, and this is the
+        // number that decides whether to seed again. `countDocuments` is the honest one.
+        val stored = places.countDocuments()
         // The marker says how many documents a finished run put in. Believing its existence alone
         // would leave the application permanently showing an empty map if the collection were
         // ever emptied under it -- by a failed index build, a partial recovery, a future
         // migration -- because nothing would ever seed again.
         if (recorded != stored) {
-            if (recorded != null) mongo.command(dropSeedMarkerCommand())
+            if (recorded != null) markers.drop()
             // A collection with documents but no matching marker holds a prefix of the seed, or
             // something else entirely. Either way the cheap fix is to start again.
-            if (stored > 0) mongo.command(dropPlacesCommand())
+            if (stored > 0) places.drop()
             emit(SeedProgress.Inserting(0))
             val inserted = insertAll(gzippedSeed)
-            if (inserted == 0) {
+            if (inserted == 0L) {
                 // Marking an empty seed as finished would be irreversible: every later start
                 // would agree the database was seeded, and it would hold nothing.
                 throw IOException("the seed asset held no documents")
             }
-            mongo.command(writeSeedMarkerCommand(inserted))
+            markers.insertOne(Document("_id", SEED_MARKER_ID).append("documents", inserted))
         }
 
         emit(SeedProgress.Indexing)
-        mongo.command(createIndexesCommand())
-        emit(SeedProgress.Ready(countPlaces()))
+        places.createIndexes(placeIndexes())
+        emit(SeedProgress.Ready(places.countDocuments()))
     }.flowOn(readOn)
 
-    private suspend fun FlowCollector<SeedProgress>.insertAll(gzippedSeed: () -> InputStream): Int {
-        var inserted = 0
+    private suspend fun FlowCollector<SeedProgress>.insertAll(gzippedSeed: () -> InputStream): Long {
+        var inserted = 0L
         gzippedSeed().use { compressed ->
             GZIPInputStream(compressed).use { seed ->
                 bsonDocuments(seed).chunked(batchSize).forEach { batch ->
-                    mongo.command(insertPlacesCommand(batch))
+                    // Unordered because the batches are independent: a document the engine
+                    // rejects should cost that document rather than the rest of the batch.
+                    places.insertMany(batch, ordered = false)
                     inserted += batch.size
                     emit(SeedProgress.Inserting(inserted))
                 }
@@ -96,23 +104,14 @@ class Seeder(
     }
 
     /** How many documents the last finished run put in, or `null` if none ever finished. */
-    private suspend fun recordedCount(): Int? =
-        mongo.documents(findSeedMarkerCommand()).firstOrNull()
-            ?.let { (it["documents"] as? Number)?.toInt() }
-
-    /**
-     * How many places are stored, counted by reading them rather than from collection metadata.
-     *
-     * A `$count` over an empty collection produces no row at all, which is the honest answer to
-     * "how many" and is why an absent one is zero rather than a failure.
-     */
-    private suspend fun countPlaces(): Int {
-        val counted = mongo.documents(countPlacesCommand()).firstOrNull() ?: return 0
-        return (counted[COUNT_FIELD] as? Number)?.toInt()
-            ?: throw IOException(
-                "counting places returned no `$COUNT_FIELD` (fields: ${counted.keys.joinToString()})",
-            )
-    }
+    private suspend fun recordedCount(): Long? =
+        markers.find(Document("_id", SEED_MARKER_ID)).firstOrNull()
+            ?.let { marker ->
+                (marker["documents"] as? Number)?.toLong()
+                    ?: throw IOException(
+                        "the seed marker carries no document count (fields: ${marker.keys.joinToString()})",
+                    )
+            }
 }
 
 /**

@@ -1,15 +1,14 @@
 package io.github.jeroenvervaeke.coffeefinder.engine
 
-import io.github.jeroenvervaeke.coffeefinder.data.MongoSeam
+import io.github.jeroenvervaeke.coffeefinder.data.query.COFFEE_DATABASE
 import io.github.jeroenvervaeke.embeddedmongodb.FreeDiskFloor
+import io.github.jeroenvervaeke.embeddedmongodb.MongoDatabase
 import io.github.jeroenvervaeke.embeddedmongodb.StorageOptions
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.job
 import kotlinx.coroutines.test.TestScope
@@ -28,7 +27,7 @@ class CoffeeDatabaseTest {
     fun `the floor it asks for is sized to this database rather than to a server`() = runTest {
         val opener = RecordingOpener()
 
-        CoffeeDatabase(DIRECTORY, engineScope(), opener).seam()
+        CoffeeDatabase(DIRECTORY, engineScope(), opener).mongo()
 
         assertEquals(FreeDiskFloor.ofMebibytes(64), opener.options.single().freeDiskFloor)
     }
@@ -56,8 +55,8 @@ class CoffeeDatabaseTest {
         val opener = RecordingOpener()
         val database = CoffeeDatabase(DIRECTORY, engineScope(), opener)
 
-        val first = database.seam()
-        val second = database.seam()
+        val first = database.mongo()
+        val second = database.mongo()
 
         assertEquals(1, opener.opens)
         assertSame(first, second)
@@ -71,7 +70,7 @@ class CoffeeDatabaseTest {
             // pays for a second cold start.
             val opener = RecordingOpener(finishImmediately = false)
             val database = CoffeeDatabase(DIRECTORY, engineScope(), opener)
-            val screen = launch { database.seam() }
+            val screen = launch { database.mongo() }
             opener.started.await()
 
             screen.cancel()
@@ -80,30 +79,30 @@ class CoffeeDatabaseTest {
             // which is how a bug that cleared the cached open on success survived it.
             runCurrent()
             opener.finish()
-            val next = database.seam()
+            val next = database.mongo()
 
             assertEquals(1, opener.opens)
-            assertSame(opener.opened.single().seam, next)
+            assertSame(opener.opened.single().mongo, next)
         }
 
     @Test
     fun `an open that failed is not remembered as the answer for every later screen`() = runTest {
         val opener = RecordingOpener(failWith = IOException("no room"))
         val database = CoffeeDatabase(DIRECTORY, engineScope(), opener)
-        assertFailsWith<IOException> { database.seam() }
+        assertFailsWith<IOException> { database.mongo() }
 
         opener.failWith = null
-        val seam = database.seam()
+        val mongo = database.mongo()
 
         assertEquals(2, opener.opens)
-        assertSame(opener.opened.single().seam, seam)
+        assertSame(opener.opened.single().mongo, mongo)
     }
 
     @Test
     fun `closing waits for the open it is racing and closes what that produced`() = runTest {
         val opener = RecordingOpener(finishImmediately = false)
         val database = CoffeeDatabase(DIRECTORY, engineScope(), opener)
-        val screen = launch { database.seam() }
+        val screen = launch { database.mongo() }
         opener.started.await()
 
         screen.cancel()
@@ -169,11 +168,7 @@ private class FakeOpenDatabase : OpenDatabase {
     var closed = false
         private set
 
-    override val seam = object : MongoSeam {
-        override suspend fun command(command: Document) = Document("ok", 1.0)
-
-        override fun documents(command: Document): Flow<Document> = emptyFlow()
-    }
+    override val mongo = MongoDatabase({ _, _ -> Document("ok", 1.0) }, COFFEE_DATABASE)
 
     override fun close() {
         closed = true

@@ -6,7 +6,7 @@ import io.github.jeroenvervaeke.coffeefinder.data.model.PlaceCategory
 import org.bson.Document
 
 /**
- * The coffee places nearest [from], nearest first, as an `aggregate` command.
+ * The coffee places nearest [from], nearest first.
  *
  * `$geoNear` does the work the application would otherwise do badly: it walks the `2dsphere`
  * index outwards from the point, so it reads the [limit] documents it returns rather than all
@@ -16,12 +16,12 @@ import org.bson.Document
  *
  * The `$limit` is a stage rather than `$geoNear`'s own deprecated `num`.
  */
-fun nearestCommand(
+fun nearestPipeline(
     from: Coordinates,
     limit: Int,
     maxDistance: Metres? = null,
     category: PlaceCategory? = null,
-): Document {
+): List<Document> {
     require(limit > 0) { "asking for $limit places returns nothing" }
     val geoNear = Document("near", geoJsonPoint(from))
         .append("distanceField", DISTANCE_FIELD)
@@ -29,10 +29,8 @@ fun nearestCommand(
     maxDistance?.let { geoNear.append("maxDistance", it.value) }
     category?.let { geoNear.append("query", Document("cat", it.stored)) }
 
-    return aggregate(
-        listOf(
-            Document("\$geoNear", geoNear),
-            Document("\$limit", limit),
-        ),
+    return listOf(
+        Document("\$geoNear", geoNear),
+        Document("\$limit", limit),
     )
 }
