@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import org.bson.Document
+import io.github.jeroenvervaeke.coffeefinder.data.query.PlaceCriteria
 
 class NearestPipelineTest {
     @Test
@@ -29,7 +30,7 @@ class NearestPipelineTest {
 
     @Test
     fun `geoNear leads the pipeline, because the index walk is where the documents come from`() {
-        val pipeline = nearestPipeline(DUBLIN, limit = 5, category = PlaceCategory.CAFE)
+        val pipeline = nearestPipeline(DUBLIN, limit = 5, criteria = PlaceCriteria(category = PlaceCategory.CAFE))
 
         assertEquals("\$geoNear", pipeline.first().keys.single())
     }
@@ -43,7 +44,7 @@ class NearestPipelineTest {
 
     @Test
     fun `a category becomes geoNear's own query rather than a stage in front of it`() {
-        val pipeline = nearestPipeline(DUBLIN, limit = 5, category = PlaceCategory.COFFEE_ROASTERY)
+        val pipeline = nearestPipeline(DUBLIN, limit = 5, criteria = PlaceCriteria(category = PlaceCategory.COFFEE_ROASTERY))
 
         assertEquals(Document("cat", "coffee_roastery"), pipeline.stage("\$geoNear")["query"])
         assertEquals(2, pipeline.size)
@@ -60,7 +61,7 @@ class NearestPipelineTest {
             from = DUBLIN,
             limit = 5,
             maxDistance = Metres.ofKilometres(2.0),
-            category = PlaceCategory.CAFE,
+            criteria = PlaceCriteria(category = PlaceCategory.CAFE),
         ).stage("\$geoNear")
 
         assertEquals(2000.0, geoNear["maxDistance"])

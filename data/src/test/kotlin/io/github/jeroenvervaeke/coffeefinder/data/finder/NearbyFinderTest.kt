@@ -3,6 +3,7 @@ package io.github.jeroenvervaeke.coffeefinder.data.finder
 import io.github.jeroenvervaeke.coffeefinder.data.DUBLIN
 import io.github.jeroenvervaeke.coffeefinder.data.FakeMongo
 import io.github.jeroenvervaeke.coffeefinder.data.placesIn
+import io.github.jeroenvervaeke.coffeefinder.data.model.Confidence
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Metres
 import io.github.jeroenvervaeke.coffeefinder.data.model.PlaceCategory
@@ -68,7 +69,9 @@ class NearbyFinderTest {
         }
         settle()
 
-        assertEquals(1, mongo.commands.size)
+        // Two commands, not five: one `$count` for the headline and one list for the rows,
+        // which is what a settled request costs however many keystrokes went into it.
+        assertEquals(2, mongo.commands.size)
         assertTrue(mongo.lastCommand.toJson().contains("cafe"))
     }
 
@@ -98,39 +101,129 @@ class NearbyFinderTest {
     }
 
     @Test
-    fun `a distance cap reaches the nearest query as geoNear's own maxDistance`() = runTest {
+    fun `the radius reaches the nearest query as geoNear's own maxDistance`() = runTest {
         val mongo = found()
         val finder = NearbyFinder(placesIn(mongo), backgroundScope)
 
-        finder.limitTo(Metres.ofKilometres(5.0))
+        finder.within(Metres.ofKilometres(5.0))
         settle()
 
         assertEquals(5000.0, mongo.lastCommand.pipeline().stage("\$geoNear")["maxDistance"])
     }
 
     @Test
-    fun `a distance cap reaches a text search too, rather than being silently dropped`() = runTest {
+    fun `the radius reaches a text search too, rather than being silently dropped`() = runTest {
         val mongo = found()
         val finder = NearbyFinder(placesIn(mongo), backgroundScope)
 
         finder.searchFor("insomnia")
-        finder.limitTo(Metres.ofKilometres(5.0))
+        finder.within(Metres.ofKilometres(5.0))
         settle()
 
         assertTrue(mongo.lastCommand.toJson().contains("5000.0"))
     }
 
     @Test
-    fun `lifting the cap asks again without one`() = runTest {
+    fun `the map opens on a kilometre, because a radius is what the headline counts inside`() =
+        runTest {
+            val mongo = found()
+            NearbyFinder(placesIn(mongo), backgroundScope)
+
+            settle()
+
+            assertEquals(1000.0, mongo.lastCommand.pipeline().stage("\$geoNear")["maxDistance"])
+        }
+
+    @Test
+    fun `a narrowed radius asks again with the new one`() = runTest {
         val mongo = found()
         val finder = NearbyFinder(placesIn(mongo), backgroundScope)
-        finder.limitTo(Metres.ofKilometres(5.0))
         settle()
 
-        finder.limitTo(null)
+        finder.within(Metres(250.0))
         settle()
 
-        assertFalse(mongo.lastCommand.pipeline().stage("\$geoNear").containsKey("maxDistance"))
+        assertEquals(250.0, mongo.lastCommand.pipeline().stage("\$geoNear")["maxDistance"])
+    }
+
+    @Test
+    fun `the headline is counted by the engine over the same selection as the list`() = runTest {
+        val mongo = found(within = 412)
+        val finder = NearbyFinder(placesIn(mongo), backgroundScope)
+
+        finder.within(Metres(750.0))
+        settle()
+
+        // The count is the first of the two commands, and it is the list's own pipeline with
+        // the `$limit` off and a `$count` on: 412 matched, 1 was listed.
+        val counting = mongo.commands.first().pipeline()
+        assertEquals(750.0, counting.stage("\$geoNear")["maxDistance"])
+        assertFalse(counting.any { it.containsKey("\$limit") })
+        assertEquals("n", counting.last()["\$count"])
+        assertEquals(412, ready(finder).matching)
+        assertEquals(1, ready(finder).places.size)
+    }
+
+    @Test
+    fun `a search counts what the text matched, not what is near`() = runTest {
+        val mongo = found(within = 3)
+        val finder = NearbyFinder(placesIn(mongo), backgroundScope)
+
+        finder.searchFor("insomnia")
+        settle()
+
+        assertEquals("\$match", mongo.commands.first().pipeline().first().keys.single())
+        assertTrue(mongo.commands.first().toJson().contains("insomnia"))
+        assertEquals(3, ready(finder).matching)
+    }
+
+    @Test
+    fun `an empty selection counts as none rather than failing on a missing row`() = runTest {
+        val mongo = FakeMongo(queryResults = { emptyList() })
+        val finder = NearbyFinder(placesIn(mongo), backgroundScope)
+
+        settle()
+
+        assertEquals(0, ready(finder).matching)
+        assertTrue(ready(finder).places.isEmpty())
+    }
+
+    @Test
+    fun `switching the limit stage off asks for the list uncapped`() = runTest {
+        val mongo = found()
+        val finder = NearbyFinder(placesIn(mongo), backgroundScope)
+
+        finder.capResults(false)
+        settle()
+
+        assertFalse(mongo.lastCommand.pipeline().any { it.containsKey("\$limit") })
+    }
+
+    @Test
+    fun `a confidence floor and a brand filter reach one query together`() = runTest {
+        val mongo = found()
+        val finder = NearbyFinder(placesIn(mongo), backgroundScope)
+
+        finder.requireConfidence(Confidence(0.9))
+        finder.requireBrand(true)
+        settle()
+
+        val query = mongo.lastCommand.pipeline().stage("\$geoNear")["query"] as Document
+        assertEquals(Document("\$gte", 0.9), query["confidence"])
+        assertEquals(Document("\$exists", true), query["brand"])
+    }
+
+    @Test
+    fun `dropping the confidence floor asks again without it`() = runTest {
+        val mongo = found()
+        val finder = NearbyFinder(placesIn(mongo), backgroundScope)
+        finder.requireConfidence(Confidence(0.9))
+        settle()
+
+        finder.requireConfidence(null)
+        settle()
+
+        assertFalse(mongo.lastCommand.pipeline().stage("\$geoNear").containsKey("query"))
     }
 
     @Test
@@ -170,16 +263,28 @@ class NearbyFinderTest {
 
         settle()
 
-        // Exact, and smaller than the debounce: see the same assertion in MapFinderTest.
-        assertEquals(ENGINE_TIME, ready(finder).took)
+        // Both queries, because both are on the screen. Exact, and smaller than the debounce:
+        // see the same assertion in MapFinderTest.
+        assertEquals(ENGINE_TIME * 2, ready(finder).took)
     }
 
-    private fun found() = FakeMongo(queryResults = { listOf(placeDocument().append("distance", 240.0)) })
+    /**
+     * An engine that answers the `$count` with [within] and the list with one place.
+     *
+     * Two answers rather than one, because a settled request is two queries: a fake that replied
+     * with places to both would be answering a `$count` with a document that has no count in it.
+     */
+    private fun found(within: Int = 1) = FakeMongo(queryResults = replies(within))
 
-    private fun slow() = FakeMongo(
-        queryResults = { listOf(placeDocument().append("distance", 240.0)) },
-        answersIn = ENGINE_TIME,
-    )
+    private fun slow() = FakeMongo(queryResults = replies(), answersIn = ENGINE_TIME)
+
+    private fun replies(within: Int = 1): (Document) -> List<Document> = { command ->
+        if (command.pipeline().any { it.containsKey("\$count") }) {
+            listOf(Document("n", within))
+        } else {
+            listOf(placeDocument().append("distance", 240.0))
+        }
+    }
 
     private fun ready(finder: NearbyFinder) = finder.state.value as NearbyState.Ready
 }

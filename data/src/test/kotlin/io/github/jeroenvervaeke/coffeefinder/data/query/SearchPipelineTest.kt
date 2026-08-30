@@ -11,6 +11,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import org.bson.Document
+import io.github.jeroenvervaeke.coffeefinder.data.query.PlaceCriteria
 
 class SearchPipelineTest {
     @Test
@@ -56,7 +57,7 @@ class SearchPipelineTest {
             text = "insomnia",
             from = DUBLIN,
             limit = 10,
-            category = PlaceCategory.CAFE,
+            criteria = PlaceCriteria(category = PlaceCategory.CAFE),
             maxDistance = Metres(2500.0),
         )
 
@@ -69,7 +70,7 @@ class SearchPipelineTest {
 
     @Test
     fun `a category filter follows the text match rather than joining it`() {
-        val pipeline = searchPipeline("insomnia", DUBLIN, limit = 10, PlaceCategory.CAFE)
+        val pipeline = searchPipeline("insomnia", DUBLIN, limit = 10, PlaceCriteria(category = PlaceCategory.CAFE))
 
         assertEquals(Document("\$match", Document("cat", "cafe")), pipeline[1])
     }

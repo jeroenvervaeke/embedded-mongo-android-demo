@@ -21,13 +21,21 @@ sealed interface NearbyState {
         val places: List<NearbyPlace>,
         val command: Document,
         /**
-         * How long the engine took to answer, measured around the query and nothing else.
+         * How long the engine took to answer, measured around the two queries and nothing else.
          *
-         * Not the whole wait: the debounce in front of it is deliberately outside this, because
-         * the question it exists to answer is what the engine costs, and adding a constant to
-         * every reading would only hide it.
+         * Both of them, because both are on the screen: the `$count` behind the headline and the
+         * capped list under it. Not the whole wait — the debounce in front of them is deliberately
+         * outside this, because the question it exists to answer is what the engine costs, and
+         * adding a constant to every reading would only hide it.
          */
         val took: Duration,
+        /**
+         * How many places match inside the radius, before the `$limit` [places] was capped with.
+         *
+         * The headline number, and the reason it is here rather than `places.size`: the list
+         * stops at fifty documents and the radius does not.
+         */
+        val matching: Long,
     ) : NearbyState
 
     /** The engine refused the query, or answered something that would not parse. */
