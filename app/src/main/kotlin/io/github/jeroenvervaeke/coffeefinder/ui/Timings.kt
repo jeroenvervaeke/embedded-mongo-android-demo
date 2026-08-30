@@ -42,6 +42,17 @@ fun logQuery(screen: String, documents: Int, took: Duration, to: TimingSink = LO
 }
 
 /**
+ * One line per attempt at locating the device: what came back, and how long it took to come.
+ *
+ * The same reasoning as [logQuery]. Whether a phone measured from a fix, from Dublin, or gave up
+ * waiting is invisible from outside the process — the screen says which, but not how long the
+ * provider took to say nothing, and that is the number that decides whether the budget is right.
+ */
+fun logLocation(outcome: String, took: Duration, to: TimingSink = LOGCAT) {
+    to.line("location: $outcome after ${took.describe()}")
+}
+
+/**
  * Times a start-up, one line per phase the seeder leaves behind.
  *
  * Per phase rather than one total, because the total is the least informative version of it: an
@@ -67,6 +78,16 @@ class StartupTimer(
     private val began = clock.markNow()
     private var phase: String? = "opening the engine"
     private var phaseBegan = began
+    private val timed = mutableListOf<StartupPhase>()
+
+    /**
+     * What each phase of this launch cost, in the order they happened.
+     *
+     * Kept as well as logged because the about screen shows them: a start-up figure belongs to
+     * the phone it was measured on, so the one worth showing is the one that just happened here
+     * rather than a number written down from somebody else's device.
+     */
+    val phases: List<StartupPhase> get() = timed
 
     /** Called for every progress the seeder publishes; prints a line when it moves on. */
     fun reached(progress: SeedProgress) = when (progress) {
@@ -93,6 +114,13 @@ class StartupTimer(
     }
 
     private fun report() {
-        phase?.let { to.line("startup: $it took ${phaseBegan.elapsedNow().describe()}") }
+        phase?.let { name ->
+            val took = phaseBegan.elapsedNow()
+            timed += StartupPhase(name, took)
+            to.line("startup: $name took ${took.describe()}")
+        }
     }
 }
+
+/** One phase of getting the database ready, and what it cost on this launch. */
+data class StartupPhase(val name: String, val took: Duration)

@@ -7,6 +7,7 @@ import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.testTimeSource
 
 /**
  * What one attempt at locating the device does to the screen and to the query behind it.
@@ -23,10 +25,42 @@ import kotlinx.coroutines.test.runTest
  * asserted on the origin the query would carry rather than on a callback having been made.
  */
 class LocationOriginTest {
+    /** What the origin said about each attempt, in the order it said it. */
+    private val reported = mutableListOf<Pair<String, Duration>>()
+
+    private val record: (String, Duration) -> Unit = { outcome, took -> reported += outcome to took }
+
+    @Test
+    fun `a fix is reported with where it landed and how long it took`() = runTest {
+        val slow = Locator {
+            delay(2.seconds)
+            CORK
+        }
+        val origin = LocationOrigin(slow, backgroundScope, BUDGET, record, testTimeSource)
+
+        origin.locate { finder() }
+        settle()
+
+        assertEquals(1, reported.size)
+        assertTrue(reported.single().first.startsWith("fixed at"), reported.single().first)
+        assertEquals(2.seconds, reported.single().second)
+    }
+
+    @Test
+    fun `giving up is reported too, because a wait that produced nothing is the interesting one`() =
+        runTest {
+            val origin = LocationOrigin(SilentLocator(), backgroundScope, BUDGET, record, testTimeSource)
+
+            origin.locate { finder() }
+            settle()
+
+            assertEquals("gave up waiting" to BUDGET, reported.single())
+        }
+
     @Test
     fun `a fix is what the query is measured from`() = runTest {
         val finder = finder()
-        val origin = LocationOrigin(Locator { CORK }, backgroundScope, BUDGET)
+        val origin = LocationOrigin(Locator { CORK }, backgroundScope, BUDGET, record, testTimeSource)
 
         origin.locate { finder }
         settle()
@@ -38,7 +72,7 @@ class LocationOriginTest {
     @Test
     fun `a provider that never calls back stops the screen saying it is still looking`() = runTest {
         val finder = finder()
-        val origin = LocationOrigin(SilentLocator(), backgroundScope, BUDGET)
+        val origin = LocationOrigin(SilentLocator(), backgroundScope, BUDGET, record, testTimeSource)
 
         origin.locate { finder }
         settle()
@@ -49,7 +83,7 @@ class LocationOriginTest {
     @Test
     fun `it gives up when the budget runs out and not a moment before`() = runTest {
         val finder = finder()
-        val origin = LocationOrigin(SilentLocator(), backgroundScope, BUDGET)
+        val origin = LocationOrigin(SilentLocator(), backgroundScope, BUDGET, record, testTimeSource)
 
         origin.locate { finder }
         // advanceTimeBy stops short of whatever is scheduled at exactly the instant it lands on,
@@ -64,7 +98,7 @@ class LocationOriginTest {
     @Test
     fun `having given up, the query is still measured from Dublin`() = runTest {
         val finder = finder()
-        val origin = LocationOrigin(SilentLocator(), backgroundScope, BUDGET)
+        val origin = LocationOrigin(SilentLocator(), backgroundScope, BUDGET, record, testTimeSource)
 
         origin.locate { finder }
         settle()
@@ -75,7 +109,7 @@ class LocationOriginTest {
     @Test
     fun `a device that will not say puts the screen on Dublin as soon as it knows`() = runTest {
         val finder = finder()
-        val origin = LocationOrigin(Locator { null }, backgroundScope, BUDGET)
+        val origin = LocationOrigin(Locator { null }, backgroundScope, BUDGET, record, testTimeSource)
 
         origin.locate { finder }
         settle()
@@ -86,7 +120,7 @@ class LocationOriginTest {
     @Test
     fun `a second ask is not overtaken by the one before it`() = runTest {
         val finder = finder()
-        val origin = LocationOrigin(slowThenPrompt(), backgroundScope, BUDGET)
+        val origin = LocationOrigin(slowThenPrompt(), backgroundScope, BUDGET, record, testTimeSource)
 
         origin.locate { finder }
         advanceTimeBy(1.seconds)
@@ -100,7 +134,7 @@ class LocationOriginTest {
     fun `an abandoned ask does not cost a second query`() = runTest {
         val engine = CountingEngine()
         val finder = finder(engine.places)
-        val origin = LocationOrigin(slowThenPrompt(), backgroundScope, BUDGET)
+        val origin = LocationOrigin(slowThenPrompt(), backgroundScope, BUDGET, record, testTimeSource)
 
         origin.locate { finder }
         advanceTimeBy(1.seconds)
@@ -115,7 +149,7 @@ class LocationOriginTest {
     @Test
     fun `a failed retry does not claim Dublin over a fix already in effect`() = runTest {
         val finder = finder()
-        val origin = LocationOrigin(ScriptedLocator(listOf(fix(CORK), fix(null))), backgroundScope, BUDGET)
+        val origin = LocationOrigin(ScriptedLocator(listOf(fix(CORK), fix(null))), backgroundScope, BUDGET, record, testTimeSource)
         origin.locate { finder }
         settle()
 
@@ -129,7 +163,7 @@ class LocationOriginTest {
     @Test
     fun `a failed retry does not claim Dublin over a point tapped on the map`() = runTest {
         val finder = finder()
-        val origin = LocationOrigin(Locator { null }, backgroundScope, BUDGET)
+        val origin = LocationOrigin(Locator { null }, backgroundScope, BUDGET, record, testTimeSource)
         origin.pick(finder, GALWAY)
 
         origin.locate { finder }
@@ -145,7 +179,7 @@ class LocationOriginTest {
             delay(2.seconds)
             CORK
         }
-        val origin = LocationOrigin(slow, backgroundScope, BUDGET)
+        val origin = LocationOrigin(slow, backgroundScope, BUDGET, record, testTimeSource)
 
         origin.locate { finder }
         origin.pick(finder, GALWAY)
@@ -160,7 +194,7 @@ class LocationOriginTest {
         // A tap beats a fix that was already on its way; it does not beat the next press of the
         // button, which is the user overruling their own tap.
         val finder = finder()
-        val origin = LocationOrigin(Locator { CORK }, backgroundScope, BUDGET)
+        val origin = LocationOrigin(Locator { CORK }, backgroundScope, BUDGET, record, testTimeSource)
         origin.pick(finder, GALWAY)
 
         origin.locate { finder }
@@ -173,7 +207,7 @@ class LocationOriginTest {
     @Test
     fun `a database that never opened does not strand the attempt on a finder it will not get`() =
         runTest {
-            val origin = LocationOrigin(Locator { CORK }, backgroundScope, BUDGET)
+            val origin = LocationOrigin(Locator { CORK }, backgroundScope, BUDGET, record, testTimeSource)
 
             origin.locate { null }
             settle()

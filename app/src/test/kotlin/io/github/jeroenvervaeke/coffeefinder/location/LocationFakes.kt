@@ -53,19 +53,29 @@ class Answer(val after: Duration, val where: Coordinates?)
 class CountingEngine : CommandRunner {
     private var ran = 0
 
+    /**
+     * How many result-set queries the engine was asked for.
+     *
+     * The `$count` behind the headline is not one of them: a settled request is two commands, and
+     * what these tests are counting is how many times the finder asked the question -- not how
+     * many commands one asking costs.
+     */
     val queries: Int get() = ran
 
     /** The places collection on this engine, which is what a repository is built from. */
     val places: MongoCollection get() = MongoDatabase(this, COFFEE_DATABASE).places()
 
     override suspend fun runCommand(database: String, command: Document): Document {
-        ran++
+        if (!command.counts()) ran++
         return Document("ok", 1.0).append(
             "cursor",
             Document("id", 0L).append("ns", "$COFFEE_DATABASE.places").append("firstBatch", emptyList<Document>()),
         )
     }
 }
+
+private fun Document.counts(): Boolean =
+    (this["pipeline"] as? List<*>).orEmpty().any { it is Document && it.containsKey("\$count") }
 
 val CORK = Coordinates(longitude = -8.4756, latitude = 51.8985)
 

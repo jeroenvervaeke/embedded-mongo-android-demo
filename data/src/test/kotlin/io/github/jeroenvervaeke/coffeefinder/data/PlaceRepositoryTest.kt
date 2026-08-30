@@ -2,6 +2,7 @@ package io.github.jeroenvervaeke.coffeefinder.data
 
 import io.github.jeroenvervaeke.coffeefinder.data.model.PlaceCategory
 import io.github.jeroenvervaeke.coffeefinder.data.model.Viewport
+import io.github.jeroenvervaeke.coffeefinder.data.query.PlaceCriteria
 import io.github.jeroenvervaeke.coffeefinder.data.query.nearestPipeline
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,11 +14,11 @@ class PlaceRepositoryTest {
     fun `the nearest query sends the pipeline it reports and parses what comes back`() = runTest {
         val mongo = FakeMongo(queryResults = { listOf(placeDocument().append("distance", 240.0)) })
 
-        val found = placesIn(mongo).nearest(DUBLIN, limit = 5, category = PlaceCategory.CAFE)
+        val found = placesIn(mongo).nearest(DUBLIN, limit = 5, criteria = PlaceCriteria(category = PlaceCategory.CAFE))
 
         assertEquals(240.0, found.results.single().distance.value)
         assertEquals("The House Of Pretzels", found.results.single().place.name)
-        assertEquals(nearestPipeline(DUBLIN, 5, category = PlaceCategory.CAFE), found.command.pipeline())
+        assertEquals(nearestPipeline(DUBLIN, 5, criteria = PlaceCriteria(category = PlaceCategory.CAFE)), found.command.pipeline())
         assertEquals(found.command, mongo.lastCommand)
     }
 
