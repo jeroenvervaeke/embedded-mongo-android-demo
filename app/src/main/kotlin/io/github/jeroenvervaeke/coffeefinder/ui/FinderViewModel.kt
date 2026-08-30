@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.jeroenvervaeke.coffeefinder.CoffeeFinderApplication
 import io.github.jeroenvervaeke.coffeefinder.SEED_ASSET
 import io.github.jeroenvervaeke.coffeefinder.data.PlaceRepository
+import io.github.jeroenvervaeke.coffeefinder.data.explorer.PipelineExplorer
 import io.github.jeroenvervaeke.coffeefinder.data.finder.MapFinder
 import io.github.jeroenvervaeke.coffeefinder.data.finder.MapState
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyFinder
@@ -98,10 +99,14 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
                     preparing.value = Startup.Preparing(progress)
                     startup.reached(progress)
                 }
-            val places = PlaceRepository(mongo.places())
+            val collection = mongo.places()
+            val places = PlaceRepository(collection)
             val ready = Startup.Ready(
                 nearby = NearbyFinder(places, viewModelScope),
                 map = MapFinder(places, viewModelScope),
+                explorer = PipelineExplorer(collection),
+                places = places,
+                startup = startup.phases,
             )
             preparing.value = ready
             reportQueriesOf(ready)

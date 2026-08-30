@@ -3,6 +3,7 @@ package io.github.jeroenvervaeke.coffeefinder.ui
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Metres
 import io.github.jeroenvervaeke.coffeefinder.data.model.PlaceCategory
+import io.github.jeroenvervaeke.coffeefinder.data.query.PlaceCriteria
 import io.github.jeroenvervaeke.coffeefinder.data.query.nearestPipeline
 import io.github.jeroenvervaeke.embeddedmongodb.CommandRunner
 import io.github.jeroenvervaeke.embeddedmongodb.MongoDatabase
@@ -62,5 +63,5 @@ private fun nearestQuery(
     category: PlaceCategory? = null,
 ): Document = MongoDatabase(CommandRunner { _, _ -> Document() }, "coffee")
     .getCollection("places")
-    .aggregate(nearestPipeline(from, limit, maxDistance, category))
+    .aggregate(nearestPipeline(from, limit, maxDistance, PlaceCriteria(category = category)))
     .command()

@@ -65,6 +65,14 @@ android {
 
     buildFeatures { compose = true }
 
+    testOptions {
+        unitTests {
+            // Robolectric reads the merged resources and the manifest; without this the Compose
+            // test rule cannot inflate an activity to host the composition.
+            isIncludeAndroidResources = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -150,6 +158,13 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.coroutines.test)
+
+    // The screens are tested with the rest: Robolectric runs the Compose test rule on the JVM,
+    // so `:app:testDebugUnitTest` covers the UI too and still needs no emulator.
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     // Location only. The rest of Play services is not on the classpath, and nothing in this
     // application talks to a network.
