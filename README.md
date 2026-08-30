@@ -120,10 +120,10 @@ Measured on a Galaxy S23 Ultra, release build, five runs each:
 
 | | |
 | --- | --- |
-| Cold start to a screen of results | **1.2–2.2 s**, including seeding 5,180 documents and building two indexes |
-| Warm start | **1.4–1.5 s**, of which the database is 440–490 ms |
-| Settled pan of the map | **33 ms** median, 75 ms worst |
-| Every place on the island, one query | **51–75 ms** |
+| Cold start, seeding 5,180 documents and building both indexes | **0.7–1.1 s** warm-cache, up to 3.6 s on the first launch after a reboot |
+| Warm start, database only | **0.3–0.6 s**. Nothing is re-seeded |
+| The 50 nearest, `$geoNear` | **15–38 ms** |
+| Every place on the island, one query | **71–114 ms** |
 | Database on disk | **10.3 MiB** — 1.5 MB documents, 0.7 MB indexes, 8 MiB journal |
 | Release APK | **59 MiB** per ABI, of which the engine is 46 MiB |
 

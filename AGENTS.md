@@ -95,13 +95,33 @@ Ships and runs. The release build is signed with the debug keystore, so `assembl
 produces an APK that installs; there is no release key, so Play App Signing, key rotation and
 Play Integrity are out of reach.
 
-Verified on a Galaxy S23 Ultra (SM-S918B, arm64, API 36), release build, on the collection API:
-engine open 739 ms, insert 228 ms, both indexes 95 ms, 5,180 places ready in 1.07 s, nearby 50 in
-12.8 ms, all 5,180 for the map in 65.8 ms. Database 10.3 MiB on disk, release APK 59 MiB per ABI.
+Measured on a Galaxy S23 Ultra (SM-S918B, arm64, API 36), release build, unlocked, battery saver
+off, on the collection API. Eight cold starts with the data cleared between each, five warm:
+
+| | |
+| --- | --- |
+| Engine open | 350 ms – 3.05 s |
+| Insert 5,180 documents | 240–493 ms |
+| Both indexes | 80–120 ms |
+| Cold start, places ready | 0.68–3.64 s |
+| Warm start, places ready | 0.32–0.63 s |
+| `$geoNear`, 50 documents | 15–38 ms |
+| `$geoWithin`, all 5,180 | 71–114 ms |
+
+**Engine open is the whole of the variance, and it is page cache.** The first three runs after
+the phone had been idle took 2.28–3.05 s; once the 46 MiB library was in cache the same run took
+350–670 ms. Quote the cold figure for a first launch after a reboot and the warm one for
+everything else. An earlier round of measurements put this at 0.3–1.2 s, which is the warm
+number alone.
 
 The location budget expires at 9.94 s by the `MONITOR_LOCATION` app op. `dumpsys location` will
 not show it: the fused provider attributes the request to `com.google.android.gms` and marks it
 `hiddenFromAppOps`.
+
+Two conditions decide whether a measurement means anything, and both bite over `adb`. A locked
+phone dozes and clocks its big core at 864 MHz. Battery saver does the same more quietly — check
+`settings get global low_power`. Check `dumpsys power | grep mWakefulness` between runs, not just
+before them: a 30-second screen timeout re-dozes the phone mid-session.
 
 One thing is open: `$geoNear` has never run from a fix outside the seed's bounding box.
 Emulators do not deliver one — `adb emu geo fix` leaves fused at `last location=null` — so it
