@@ -14,7 +14,6 @@ import io.github.jeroenvervaeke.coffeefinder.data.query.viewportPipeline
 import io.github.jeroenvervaeke.embeddedmongodb.MongoCollection
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import org.bson.Document
@@ -32,9 +31,9 @@ data class Queried<T>(val results: List<T>, val command: Document)
 /**
  * The three questions this application asks about coffee places.
  *
- * Each is a pipeline handed to [places] and read back as domain types. The library builds the
- * `aggregate` command, opens the cursor and pages it; what is left here is the pipeline, the
- * parsing, and where the parsing runs.
+ * Each is a pipeline handed to [places] and read back as domain types, by handing the parsing
+ * function to the query itself. The library builds the `aggregate` command, opens the cursor and
+ * pages it; what is left here is the pipeline, the parsing, and where the parsing runs.
  *
  * [decodeOn] is where replies are turned into [Place]s. It matters: without it the parsing runs
  * wherever the *collector* is, which on Android is the main thread — six thousand documents of
@@ -70,6 +69,6 @@ class PlaceRepository(
 
     private suspend fun <T> run(pipeline: List<Document>, read: (Document) -> T): Queried<T> {
         val query = places.aggregate(pipeline)
-        return withContext(decodeOn) { Queried(query.asFlow().map(read).toList(), query.command()) }
+        return withContext(decodeOn) { Queried(query.asFlow(read).toList(), query.command()) }
     }
 }

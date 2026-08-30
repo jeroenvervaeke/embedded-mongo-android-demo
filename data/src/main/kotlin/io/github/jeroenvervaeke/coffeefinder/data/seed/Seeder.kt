@@ -4,6 +4,7 @@ import io.github.jeroenvervaeke.coffeefinder.data.query.placeIndexes
 import io.github.jeroenvervaeke.embeddedmongodb.MongoCollection
 import io.github.jeroenvervaeke.embeddedmongodb.countDocuments
 import io.github.jeroenvervaeke.embeddedmongodb.createIndexes
+import io.github.jeroenvervaeke.embeddedmongodb.drop
 import io.github.jeroenvervaeke.embeddedmongodb.insertMany
 import io.github.jeroenvervaeke.embeddedmongodb.insertOne
 import java.io.IOException
