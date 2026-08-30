@@ -2,6 +2,7 @@ package io.github.jeroenvervaeke.coffeefinder.data.geo
 
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
+import io.github.jeroenvervaeke.coffeefinder.data.model.Metres
 import io.github.jeroenvervaeke.coffeefinder.data.model.Viewport
 import kotlin.math.abs
 import kotlin.math.cos
@@ -83,6 +84,23 @@ data class Camera(val centre: Coordinates, val latitudeSpan: Double) {
         }
 
         /**
+         * A camera centred on [centre] with a circle of [radius] framed inside it.
+         *
+         * What the console screen opens on, because its headline is a count inside a radius and a
+         * ring drawn two pixels across says nothing. [margin] is how many radii fit top to bottom:
+         * three leaves the ring filling the middle third of a portrait screen with the ground it
+         * sits in around it.
+         *
+         * Latitude only, since that is what a camera spans; a degree of it is the same distance
+         * everywhere, which is the whole reason the camera is expressed in it.
+         */
+        fun around(centre: Coordinates, radius: Metres, margin: Double = RADII_ON_SCREEN): Camera {
+            require(margin > 0) { "a margin of $margin radii frames nothing" }
+            val span = radius.value * margin / METRES_PER_DEGREE_LATITUDE
+            return Camera(centre, span.coerceIn(MINIMUM_SPAN, MAXIMUM_SPAN))
+        }
+
+        /**
          * The whole island, framed for a portrait phone — so the first thing drawn is every
          * document in the database. Reframed as soon as the canvas reports its real shape.
          */
@@ -99,6 +117,17 @@ data class Camera(val centre: Coordinates, val latitudeSpan: Double) {
 
         /** Wider than the seed's extent, so zooming out stops at "the island, with room around it". */
         const val MAXIMUM_SPAN = 12.0
+
+        /** How many radii fit top to bottom in [around]: the ring, and ground around it. */
+        private const val RADII_ON_SCREEN = 3.0
+
+        /**
+         * One degree of latitude, in metres.
+         *
+         * The WGS84 mean, which is what [around] needs: it is sizing a screen, not measuring a
+         * distance the engine already measures on its own sphere.
+         */
+        private const val METRES_PER_DEGREE_LATITUDE = 110_574.0
     }
 }
 

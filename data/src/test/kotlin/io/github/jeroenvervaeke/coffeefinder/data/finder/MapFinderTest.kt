@@ -1,10 +1,12 @@
 package io.github.jeroenvervaeke.coffeefinder.data.finder
 
+import io.github.jeroenvervaeke.coffeefinder.data.CORK
 import io.github.jeroenvervaeke.coffeefinder.data.FakeMongo
 import io.github.jeroenvervaeke.coffeefinder.data.placesIn
 import io.github.jeroenvervaeke.coffeefinder.data.geo.Camera
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
+import io.github.jeroenvervaeke.coffeefinder.data.model.Metres
 import io.github.jeroenvervaeke.coffeefinder.data.placeDocument
 import java.io.IOException
 import kotlin.test.Test
@@ -161,6 +163,68 @@ class MapFinderTest {
         settle()
 
         assertEquals(chosen, finder.camera.value)
+    }
+
+    @Test
+    fun `framing the radius puts the whole of it on screen`() = runTest {
+        val finder = MapFinder(placesIn(found()), backgroundScope)
+
+        finder.frameOn(CORK, Metres(1_000.0))
+        settle()
+
+        val viewport = ready(finder).viewport
+        assertTrue(CORK in viewport)
+        // A kilometre north of the centre is about 0.009 degrees of latitude, and the ring has to
+        // fit with ground around it rather than run off the top of the screen.
+        assertTrue(Coordinates(CORK.longitude, CORK.latitude + 0.009) in viewport)
+    }
+
+    @Test
+    fun `a resize after framing a radius keeps the radius framed rather than refitting the island`() =
+        runTest {
+            val finder = MapFinder(placesIn(found()), backgroundScope)
+            finder.frameOn(CORK, Metres(1_000.0))
+            val framed = finder.camera.value
+
+            finder.resizedTo(1.8)
+            settle()
+
+            assertEquals(framed, finder.camera.value)
+        }
+
+    @Test
+    fun `framing unless moved leaves a camera the user has taken over alone`() = runTest {
+        val finder = MapFinder(placesIn(found()), backgroundScope)
+        finder.moveBy(eastFraction = 0.2, northFraction = 0.0, zoom = 1.0)
+        val chosen = finder.camera.value
+
+        finder.frameOnUnlessMoved(CORK, Metres(1_000.0))
+
+        assertEquals(chosen, finder.camera.value)
+    }
+
+    @Test
+    fun `framing unless moved does frame a camera nobody has touched`() = runTest {
+        val finder = MapFinder(placesIn(found()), backgroundScope)
+
+        finder.frameOnUnlessMoved(CORK, Metres(1_000.0))
+        settle()
+
+        assertTrue(CORK in ready(finder).viewport)
+    }
+
+    @Test
+    fun `asking for the island again lets a later rotation keep it framed`() = runTest {
+        val finder = MapFinder(placesIn(found()), backgroundScope)
+        finder.frameOn(CORK, Metres(1_000.0))
+
+        finder.frameIreland()
+        finder.resizedTo(1.8)
+        settle()
+
+        val viewport = ready(finder).viewport
+        assertTrue(Coordinates(Ireland.EXTENT.west, Ireland.EXTENT.south) in viewport)
+        assertTrue(Coordinates(Ireland.EXTENT.east, Ireland.EXTENT.north) in viewport)
     }
 
     @Test

@@ -3,7 +3,9 @@ package io.github.jeroenvervaeke.coffeefinder.data.finder
 import io.github.jeroenvervaeke.coffeefinder.data.PlaceRepository
 import io.github.jeroenvervaeke.coffeefinder.data.geo.Camera
 import io.github.jeroenvervaeke.coffeefinder.data.geo.showsSameAs
+import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
 import io.github.jeroenvervaeke.coffeefinder.data.model.Ireland
+import io.github.jeroenvervaeke.coffeefinder.data.model.Metres
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.time.TimeSource
@@ -48,8 +50,11 @@ class MapFinder(
     private val cameraState = MutableStateFlow(Camera.IRELAND)
     private val aspectRatio = MutableStateFlow(Camera.PORTRAIT_ASPECT_RATIO)
 
-    /** Whether the user has taken over the camera; until then the island is reframed to fit. */
+    /** Whether a pan or a pinch has happened, which is what makes the camera the user's. */
     private var moved = false
+
+    /** Whether a resize still refits the island, which stops as soon as anything else frames. */
+    private var refitsIsland = true
 
     val camera: StateFlow<Camera> get() = cameraState
 
@@ -73,25 +78,50 @@ class MapFinder(
      */
     fun moveBy(eastFraction: Double, northFraction: Double, zoom: Double) {
         moved = true
+        refitsIsland = false
         cameraState.update { it.panned(eastFraction, northFraction, aspectRatio.value).zoomedBy(zoom) }
+    }
+
+    /**
+     * Frames the radius the console screen is counting inside, around where it is measuring from.
+     *
+     * Asked for, so it takes the camera: a later resize will not throw it away and refit the
+     * island.
+     */
+    fun frameOn(centre: Coordinates, radius: Metres) {
+        moved = true
+        refitsIsland = false
+        cameraState.value = Camera.around(centre, radius)
+    }
+
+    /**
+     * The same, but only while the camera is still the application's.
+     *
+     * What the console screen calls when it opens and when a location fix finally lands. A fix
+     * that arrived after somebody had panned somewhere would otherwise pull the map out from
+     * under them — and so would coming back to the map tab, which composes the screen again.
+     */
+    fun frameOnUnlessMoved(centre: Coordinates, radius: Metres) {
+        if (!moved) frameOn(centre, radius)
     }
 
     /** Frames the whole island again, and lets a later resize keep it framed. */
     fun frameIreland() {
         moved = false
+        refitsIsland = true
         cameraState.value = Camera.covering(Ireland.EXTENT, aspectRatio.value)
     }
 
     /**
      * The canvas reports its shape, because that is what decides how wide the viewport is.
      *
-     * Until the map has been panned or zoomed it is also reframed to hold the whole island —
-     * which is what makes the opening view right on a tablet and after a rotation, not only on
-     * the portrait phone the default assumes.
+     * While the island is what is framed, it is reframed to the new shape — which is what makes
+     * the view right on a tablet and after a rotation, not only on the portrait phone the default
+     * assumes. Once something has framed something else, a resize only changes the viewport.
      */
     fun resizedTo(aspectRatio: Double) {
         this.aspectRatio.value = aspectRatio
-        if (!moved) cameraState.value = Camera.covering(Ireland.EXTENT, aspectRatio)
+        if (refitsIsland) cameraState.value = Camera.covering(Ireland.EXTENT, aspectRatio)
     }
 
     private suspend fun load(view: View): MapState = try {
