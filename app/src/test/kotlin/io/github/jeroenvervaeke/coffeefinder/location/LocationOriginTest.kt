@@ -1,6 +1,6 @@
 package io.github.jeroenvervaeke.coffeefinder.location
 
-import io.github.jeroenvervaeke.coffeefinder.data.MongoSeam
+import io.github.jeroenvervaeke.embeddedmongodb.MongoCollection
 import io.github.jeroenvervaeke.coffeefinder.data.PlaceRepository
 import io.github.jeroenvervaeke.coffeefinder.data.finder.NearbyFinder
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
@@ -98,8 +98,8 @@ class LocationOriginTest {
 
     @Test
     fun `an abandoned ask does not cost a second query`() = runTest {
-        val mongo = CountingSeam()
-        val finder = finder(mongo)
+        val engine = CountingEngine()
+        val finder = finder(engine.places)
         val origin = LocationOrigin(slowThenPrompt(), backgroundScope, BUDGET)
 
         origin.locate { finder }
@@ -109,7 +109,7 @@ class LocationOriginTest {
 
         // The opening Dublin query, and one for the fix that won. Not a third for the fix that
         // was abandoned and answered anyway.
-        assertEquals(2, mongo.queries)
+        assertEquals(2, engine.queries)
     }
 
     @Test
@@ -194,8 +194,8 @@ class LocationOriginTest {
     /** An answer that arrives at once, which is every ask whose timing is not the point. */
     private fun fix(where: Coordinates?) = Answer(after = Duration.ZERO, where = where)
 
-    private fun TestScope.finder(mongo: MongoSeam = CountingSeam()) =
-        NearbyFinder(PlaceRepository(mongo, StandardTestDispatcher(testScheduler)), backgroundScope)
+    private fun TestScope.finder(places: MongoCollection = CountingEngine().places) =
+        NearbyFinder(PlaceRepository(places, StandardTestDispatcher(testScheduler)), backgroundScope)
 
     /**
      * Past the budget, past the debounce in front of a query, and through the query.

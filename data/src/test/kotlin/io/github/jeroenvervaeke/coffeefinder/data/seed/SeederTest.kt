@@ -4,7 +4,7 @@ import io.github.jeroenvervaeke.coffeefinder.data.FakeMongo
 import io.github.jeroenvervaeke.coffeefinder.data.namedDispatcher
 import io.github.jeroenvervaeke.coffeefinder.data.okReply
 import io.github.jeroenvervaeke.coffeefinder.data.placeDocument
-import io.github.jeroenvervaeke.coffeefinder.data.query.SEED_MARKER_ID
+import io.github.jeroenvervaeke.embeddedmongodb.EmbeddedMongoException
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -16,6 +16,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.bson.Document
 
@@ -24,7 +25,7 @@ class SeederTest {
     fun `an empty database is filled, then indexed, then reported ready`() = runTest {
         val database = EmptyDatabase()
 
-        val progress = Seeder(database.mongo, batchSize = 2, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(3)).toList()
+        val progress = seeder(database, batchSize = 2).seed(gzipped(3)).toList()
 
         assertEquals(
             listOf(
@@ -43,7 +44,7 @@ class SeederTest {
     fun `the indexes are built after the documents rather than in front of them`() = runTest {
         val database = EmptyDatabase()
 
-        Seeder(database.mongo, batchSize = 2, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(3)).toList()
+        seeder(database, batchSize = 2).seed(gzipped(3)).toList()
 
         val names = database.mongo.commands.map { it.keys.first() }
         assertTrue(
@@ -56,18 +57,30 @@ class SeederTest {
     fun `the marker is written only once every document is in`() = runTest {
         val database = EmptyDatabase()
 
-        Seeder(database.mongo, batchSize = 2, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(3)).toList()
+        seeder(database, batchSize = 2).seed(gzipped(3)).toList()
 
         val inserts = database.mongo.commands.filter { it.containsKey("insert") }
         assertEquals(listOf("places", "places", "seed"), inserts.map { it.getString("insert") })
     }
 
     @Test
+    fun `the marker records how many documents went in`() = runTest {
+        val database = EmptyDatabase()
+
+        seeder(database, batchSize = 2).seed(gzipped(3)).toList()
+
+        val marker = database.mongo.commands.last { it.getString("insert") == "seed" }
+            .let { (it["documents"] as List<*>).single() as Document }
+        assertEquals("places", marker["_id"])
+        assertEquals(3L, marker["documents"])
+    }
+
+    @Test
     fun `a database that already carries the marker is indexed but not seeded again`() = runTest {
-        val database = EmptyDatabase(marker = Document("_id", SEED_MARKER_ID).append("documents", 3))
+        val database = EmptyDatabase(marker = Document("_id", "places").append("documents", 3))
         database.stored = 3
 
-        val progress = Seeder(database.mongo, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(3)).toList()
+        val progress = seeder(database).seed(gzipped(3)).toList()
 
         assertEquals(listOf(SeedProgress.Checking, SeedProgress.Indexing, SeedProgress.Ready(3)), progress)
         assertTrue(database.mongo.commands.none { it.containsKey("insert") })
@@ -78,11 +91,10 @@ class SeederTest {
     fun `a marker that disagrees with what is stored starts the seed again`() = runTest {
         // The collection emptied under a marker that says it holds three: believing the marker
         // alone would leave the application showing an empty map on every launch, for ever.
-        val database = EmptyDatabase(marker = Document("_id", SEED_MARKER_ID).append("documents", 3))
+        val database = EmptyDatabase(marker = Document("_id", "places").append("documents", 3))
         database.stored = 0
 
-        val progress = Seeder(database.mongo, 2, StandardTestDispatcher(testScheduler))
-            .seed(gzipped(3)).toList()
+        val progress = seeder(database, batchSize = 2).seed(gzipped(3)).toList()
 
         assertEquals(SeedProgress.Ready(3), progress.last())
         assertTrue(database.mongo.commands.any { it.getString("drop") == "seed" })
@@ -91,10 +103,10 @@ class SeederTest {
 
     @Test
     fun `a marker that agrees with what is stored is believed`() = runTest {
-        val database = EmptyDatabase(marker = Document("_id", SEED_MARKER_ID).append("documents", 3))
+        val database = EmptyDatabase(marker = Document("_id", "places").append("documents", 3))
         database.stored = 3
 
-        Seeder(database.mongo, 2, StandardTestDispatcher(testScheduler)).seed(gzipped(3)).toList()
+        seeder(database, batchSize = 2).seed(gzipped(3)).toList()
 
         assertTrue(database.mongo.commands.none { it.containsKey("drop") })
     }
@@ -104,9 +116,7 @@ class SeederTest {
         // Marking an empty seed done is irreversible: every later start would agree.
         val database = EmptyDatabase()
 
-        assertFailsWith<IOException> {
-            Seeder(database.mongo, 2, StandardTestDispatcher(testScheduler)).seed(gzipped(0)).toList()
-        }
+        assertFailsWith<IOException> { seeder(database, batchSize = 2).seed(gzipped(0)).toList() }
         assertTrue(database.mongo.commands.none { it.getString("insert") == "seed" })
     }
 
@@ -116,7 +126,7 @@ class SeederTest {
         val database = EmptyDatabase()
         database.stored = 1
 
-        Seeder(database.mongo, batchSize = 2, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(3)).toList()
+        seeder(database, batchSize = 2).seed(gzipped(3)).toList()
 
         assertTrue(database.mongo.commands.any { it.containsKey("drop") })
         assertEquals(3, database.stored)
@@ -126,7 +136,7 @@ class SeederTest {
     fun `a first run does not drop a collection that was never created`() = runTest {
         val database = EmptyDatabase()
 
-        Seeder(database.mongo, batchSize = 2, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(3)).toList()
+        seeder(database, batchSize = 2).seed(gzipped(3)).toList()
 
         assertTrue(database.mongo.commands.none { it.containsKey("drop") })
     }
@@ -137,7 +147,7 @@ class SeederTest {
         var opened = 0
         val seed = gzipped(2)
 
-        val flow = Seeder(database.mongo, batchSize = 2, readOn = StandardTestDispatcher(testScheduler)).seed { opened++; seed() }
+        val flow = seeder(database, batchSize = 2).seed { opened++; seed() }
         flow.toList()
         flow.toList()
 
@@ -148,12 +158,28 @@ class SeederTest {
     fun `a count row without a count in it is reported rather than read as empty`() = runTest {
         // Reading it as empty would be worse than failing: seeding would decide the collection
         // held nothing and start again over documents that were already there.
-        val mongo = FakeMongo(queryResults = { listOf(Document("total", 5)) })
+        val mongo = FakeMongo(
+            queryResults = { command ->
+                if (command.containsKey("aggregate")) listOf(Document("total", 5)) else emptyList()
+            },
+        )
 
-        assertFailsWith<IOException> {
-            Seeder(mongo, readOn = StandardTestDispatcher(testScheduler)).seed(gzipped(1)).toList()
+        assertFailsWith<EmbeddedMongoException> {
+            Seeder(mongo.places, mongo.markers, readOn = StandardTestDispatcher(testScheduler))
+                .seed(gzipped(1)).toList()
         }
     }
+
+    @Test
+    fun `a marker without a document count is reported rather than read as no marker at all`() =
+        runTest {
+            // Reading it as absent would drop the collection and reseed over documents already in
+            // it, which is the one outcome the marker exists to prevent.
+            val database = EmptyDatabase(marker = Document("_id", "places"))
+            database.stored = 3
+
+            assertFailsWith<IOException> { seeder(database).seed(gzipped(3)).toList() }
+        }
 
     @Test
     fun `the seed is read and inserted away from the thread collecting the progress`() = runTest {
@@ -161,7 +187,8 @@ class SeederTest {
         try {
             val database = EmptyDatabase()
 
-            Seeder(database.mongo, batchSize = 2, readOn = reader).seed(gzipped(3)).toList()
+            Seeder(database.mongo.places, database.mongo.markers, batchSize = 2, readOn = reader)
+                .seed(gzipped(3)).toList()
 
             // The coroutine debugger appends its own suffix to the thread name.
             assertTrue(
@@ -175,9 +202,18 @@ class SeederTest {
 
     @Test
     fun `a batch size of zero is refused when the seeder is built`() {
-        assertFailsWith<IllegalArgumentException> { Seeder(FakeMongo(), batchSize = 0) }
+        val mongo = FakeMongo()
+
+        assertFailsWith<IllegalArgumentException> { Seeder(mongo.places, mongo.markers, batchSize = 0) }
     }
 }
+
+private fun TestScope.seeder(database: EmptyDatabase, batchSize: Int = 500) = Seeder(
+    database.mongo.places,
+    database.mongo.markers,
+    batchSize = batchSize,
+    readOn = StandardTestDispatcher(testScheduler),
+)
 
 /**
  * A database that starts empty and counts what is inserted into it, which is what the seeder's
@@ -194,6 +230,7 @@ private class EmptyDatabase(marker: Document? = null) {
                     okReply("n" to (command["documents"] as List<*>).size)
                         .also { stored += (command["documents"] as List<*>).size }
                 command.getString("drop") == "places" -> okReply().also { stored = 0 }
+                command.containsKey("insert") -> okReply("n" to (command["documents"] as List<*>).size)
                 else -> okReply()
             }
         },

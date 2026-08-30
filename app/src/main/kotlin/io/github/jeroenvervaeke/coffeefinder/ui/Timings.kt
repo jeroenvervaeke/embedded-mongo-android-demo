@@ -85,7 +85,7 @@ class StartupTimer(
         phaseBegan = clock.markNow()
     }
 
-    private fun finish(places: Int) {
+    private fun finish(places: Long) {
         report()
         // Cleared so a seeder that somehow published twice cannot report the last phase twice.
         phase = null

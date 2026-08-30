@@ -46,7 +46,7 @@ class TimingsTest {
         timer.reached(SeedProgress.Inserting(inserted = 500))
         repeat(11) {
             clock += 20.milliseconds
-            timer.reached(SeedProgress.Inserting(inserted = (it + 2) * 500))
+            timer.reached(SeedProgress.Inserting(inserted = (it + 2L) * 500))
         }
         timer.reached(SeedProgress.Indexing)
 

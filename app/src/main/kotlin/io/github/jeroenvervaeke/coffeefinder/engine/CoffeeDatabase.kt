@@ -1,6 +1,6 @@
 package io.github.jeroenvervaeke.coffeefinder.engine
 
-import io.github.jeroenvervaeke.coffeefinder.data.MongoSeam
+import io.github.jeroenvervaeke.embeddedmongodb.MongoDatabase
 import io.github.jeroenvervaeke.embeddedmongodb.FreeDiskFloor
 import io.github.jeroenvervaeke.embeddedmongodb.StorageOptions
 import java.io.File
@@ -35,8 +35,8 @@ class CoffeeDatabase(
     private val lock = Mutex()
     private var starting: Deferred<OpenDatabase>? = null
 
-    /** Opens the database if it is not open yet and returns the seam onto it. */
-    suspend fun seam(): MongoSeam = database().seam
+    /** Opens the database if it is not open yet and returns the [MongoDatabase] onto it. */
+    suspend fun mongo(): MongoDatabase = opened().mongo
 
     /**
      * Closes the database, waiting for an open in flight rather than racing it.
@@ -56,7 +56,7 @@ class CoffeeDatabase(
     // getCompletionExceptionOrNull is the only way to ask a Deferred whether it *failed* rather
     // than merely finished, and it is still marked experimental.
     @OptIn(ExperimentalCoroutinesApi::class)
-    private suspend fun database(): OpenDatabase {
+    private suspend fun opened(): OpenDatabase {
         val opening = lock.withLock {
             starting ?: scope.async { opener.open(directory, COFFEE_STORAGE) }.also { starting = it }
         }

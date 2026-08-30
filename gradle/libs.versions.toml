@@ -34,6 +34,8 @@ bson = { module = "org.mongodb:bson", version.ref = "bson" }
 # No version: the module is not published anywhere yet, and settings.gradle.kts substitutes the
 # included build's project for it. A version here would be a version nobody could resolve.
 embedded-mongodb = { module = "io.github.jeroenvervaeke:embedded-mongodb" }
+# The Android-free half: databases, collections and queries, which is all `:data` needs.
+embedded-mongodb-core = { module = "io.github.jeroenvervaeke:embedded-mongodb-core" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 junit = { module = "junit:junit", version.ref = "junit" }

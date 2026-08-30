@@ -1,14 +1,16 @@
 package io.github.jeroenvervaeke.coffeefinder.location
 
-import io.github.jeroenvervaeke.coffeefinder.data.MongoSeam
 import io.github.jeroenvervaeke.coffeefinder.data.model.Coordinates
+import io.github.jeroenvervaeke.coffeefinder.data.query.COFFEE_DATABASE
+import io.github.jeroenvervaeke.coffeefinder.data.query.places
+import io.github.jeroenvervaeke.embeddedmongodb.CommandRunner
+import io.github.jeroenvervaeke.embeddedmongodb.MongoCollection
+import io.github.jeroenvervaeke.embeddedmongodb.MongoDatabase
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import org.bson.Document
 
 /**
@@ -45,17 +47,24 @@ class Answer(val after: Duration, val where: Coordinates?)
 /**
  * Enough of the engine for a `NearbyFinder` to run, and a count of the queries it ran.
  *
- * Counted where the flow is collected rather than where it is built, so it counts queries the
- * engine would actually have been asked.
+ * Counted where the command is sent rather than where the query is built, so it counts the
+ * queries the engine would actually have been asked.
  */
-class CountingSeam : MongoSeam {
+class CountingEngine : CommandRunner {
     private var ran = 0
 
     val queries: Int get() = ran
 
-    override suspend fun command(command: Document): Document = Document("ok", 1.0)
+    /** The places collection on this engine, which is what a repository is built from. */
+    val places: MongoCollection get() = MongoDatabase(this, COFFEE_DATABASE).places()
 
-    override fun documents(command: Document): Flow<Document> = flow { ran++ }
+    override suspend fun runCommand(database: String, command: Document): Document {
+        ran++
+        return Document("ok", 1.0).append(
+            "cursor",
+            Document("id", 0L).append("ns", "$COFFEE_DATABASE.places").append("firstBatch", emptyList<Document>()),
+        )
+    }
 }
 
 val CORK = Coordinates(longitude = -8.4756, latitude = 51.8985)

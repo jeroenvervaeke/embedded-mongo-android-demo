@@ -1,16 +1,15 @@
 package io.github.jeroenvervaeke.coffeefinder.data.query
 
 import io.github.jeroenvervaeke.coffeefinder.data.model.Viewport
-import io.github.jeroenvervaeke.coffeefinder.data.pipeline
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import org.bson.Document
 
-class ViewportCommandTest {
+class ViewportPipelineTest {
     @Test
     fun `the viewport becomes a closed anticlockwise GeoJSON ring`() {
-        val match = viewportCommand(BOX, limit = 100).pipeline().first()["\$match"] as Document
+        val match = viewportPipeline(BOX, limit = 100).first()["\$match"] as Document
         val geometry = ((match["loc"] as Document)["\$geoWithin"] as Document)["\$geometry"]
 
         assertEquals(
@@ -32,7 +31,7 @@ class ViewportCommandTest {
 
     @Test
     fun `the reply is cut down to what a dot and its label need`() {
-        val project = viewportCommand(BOX, limit = 100).pipeline().last()["\$project"] as Document
+        val project = viewportPipeline(BOX, limit = 100).last()["\$project"] as Document
 
         // The values matter as much as the keys: a 0 here excludes the field instead of keeping
         // it, and `loc` excluded is a map with nothing to draw.
@@ -45,7 +44,7 @@ class ViewportCommandTest {
 
     @Test
     fun `the limit is applied before the projection, so nothing is shaped that is thrown away`() {
-        val pipeline = viewportCommand(BOX, limit = 100).pipeline()
+        val pipeline = viewportPipeline(BOX, limit = 100)
 
         assertEquals(listOf("\$match", "\$limit", "\$project"), pipeline.map { it.keys.single() })
         assertEquals(100, pipeline[1]["\$limit"])
@@ -53,7 +52,7 @@ class ViewportCommandTest {
 
     @Test
     fun `a limit of zero is refused rather than sent as a query returning nothing`() {
-        assertFailsWith<IllegalArgumentException> { viewportCommand(BOX, limit = 0) }
+        assertFailsWith<IllegalArgumentException> { viewportPipeline(BOX, limit = 0) }
     }
 }
 

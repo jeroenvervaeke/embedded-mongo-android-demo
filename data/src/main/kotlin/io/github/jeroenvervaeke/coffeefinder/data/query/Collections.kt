@@ -1,18 +1,31 @@
 package io.github.jeroenvervaeke.coffeefinder.data.query
 
-/** The one database and the one collection this application has. */
+import io.github.jeroenvervaeke.embeddedmongodb.MongoCollection
+import io.github.jeroenvervaeke.embeddedmongodb.MongoDatabase
+
+/** The one database this application has. */
 const val COFFEE_DATABASE = "coffee"
 
 const val PLACES_COLLECTION = "places"
+
+/** Holds the one document recording that a seed finished. */
+const val SEED_COLLECTION = "seed"
+
+/**
+ * The two collections, named here rather than at every call site.
+ *
+ * A `MongoCollection` is a name and a way to run commands, so making one costs nothing and these
+ * are functions rather than something cached.
+ */
+fun MongoDatabase.places(): MongoCollection = collection(PLACES_COLLECTION)
+
+fun MongoDatabase.seedMarkers(): MongoCollection = collection(SEED_COLLECTION)
 
 /**
  * The field a geo query writes its distance into. `$geoNear` names it in `distanceField`, and the
  * text search computes the same field itself, so one parser reads both.
  */
 const val DISTANCE_FIELD = "distance"
-
-/** The field a `$count` stage writes its total into. */
-const val COUNT_FIELD = "count"
 
 /**
  * How far MongoDB thinks it is to the other side of the planet.

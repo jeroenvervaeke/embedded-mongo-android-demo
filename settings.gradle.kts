@@ -48,12 +48,16 @@ if (libraryDir.resolve("settings.gradle.kts").isFile) {
         dependencySubstitution {
             substitute(module("io.github.jeroenvervaeke:embedded-mongodb"))
                 .using(project(":embedded-mongodb"))
+            // `:data` depends on this one alone: it is plain Kotlin, so the whole data layer is
+            // still compiled and tested without the Android SDK or a built engine.
+            substitute(module("io.github.jeroenvervaeke:embedded-mongodb-core"))
+                .using(project(":embedded-mongodb-core"))
         }
     }
 } else {
     logger.warn(
-        "embedded-mongodb is not at $libraryDir, so :app cannot be built. Set " +
+        "embedded-mongodb is not at $libraryDir, so nothing here can be built. Set " +
             "embeddedMongoAndroidDir to the `android` directory of a checkout of " +
-            "github.com/jeroenvervaeke/embedded-mongo. :data and its tests are unaffected.",
+            "github.com/jeroenvervaeke/embedded-mongo.",
     )
 }
