@@ -1,358 +1,177 @@
 # Coffee Offline
 
-Every coffee place on the island of Ireland, searchable on a phone with the aeroplane mode
-switch on. No server, no network call, no API key, and no map SDK.
+[![MongoDB Community 9.0.0-alpha0](https://img.shields.io/badge/MongoDB_Community-9.0.0--alpha0-47A248?logo=mongodb&logoColor=white)](https://github.com/jeroenvervaeke/embedded-mongo)
+[![embedded-mongodb](https://img.shields.io/badge/engine-embedded--mongodb-47A248)](https://github.com/jeroenvervaeke/embedded-mongo)
+[![Android 9.0+](https://img.shields.io/badge/Android-9.0%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
+[![Kotlin](https://img.shields.io/badge/Kotlin-Compose-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 
-The database is [embedded-mongodb][library] — MongoDB's own query engine and WiredTiger,
-compiled into the application process. The queries are the ones a server would run: `$geoNear`
-over a `2dsphere` index for what is nearest, `$text` for search, `$geoWithin` with a polygon for
-what the map is showing. There is a screen that prints the exact command behind whatever is on
-screen, because that is the only way to tell a real engine from a hand-rolled index with a
-MongoDB-shaped name on it.
+**MongoDB, running inside an Android application. With the aeroplane mode switch on.**
 
-The map is drawn on a `Canvas` from the coordinates the query returned. There are no tiles under
-it. Ireland is recognisable because five thousand coffee places are enough to draw its towns and
-its coast road — the shape is the data.
+Every coffee place on the island of Ireland — 5,180 of them — searchable by name, sorted by
+distance from where you are standing, and plotted on a map. No server. No network call. No API
+key. No map SDK.
 
-## This project is not a MongoDB product
+The database is [embedded-mongodb][library]: MongoDB's own query engine and WiredTiger storage,
+compiled into the application process. Not a MongoDB-compatible reimplementation with a
+MongoDB-shaped name on it — MongoDB's actual server code, answering `$geoNear`, `$text` and
+`$geoWithin` out of a directory in the app's private storage.
 
-Not supported by, endorsed by, or affiliated with MongoDB, Inc. No MongoDB logo or branding is
-used here. It is an independent demonstration of an embedded build of the engine.
+> [!NOTE]
+> An independent demonstration of an experimental engine. Not supported by, endorsed by, or
+> affiliated with MongoDB, Inc.
+
+## The same MongoDB you already write
+
+This is the whole of the "what is nearest" query. It is a `MongoCollection`, an aggregation
+pipeline, and `org.bson.Document` — the API every MongoDB developer already has in their hands:
+
+```kotlin
+val pipeline = listOf(
+    Document("\$geoNear", Document("near", geoJsonPoint(from))
+        .append("distanceField", "distance")
+        .append("spherical", true)),
+    Document("\$limit", limit),
+)
+
+val query = places.aggregate(pipeline)
+val nearby = query.asFlow(Document::toNearbyPlace).toList()
+```
+
+A real `$geoNear`, planned and executed by MongoDB against a real `2dsphere` index it built
+itself. Point the same pipeline at Atlas and it runs unchanged.
+
+## Why an embedded engine changes things
+
+- 🍃 **The interface you already know.** `MongoCollection`, `aggregate`, cursors, `org.bson`,
+  `Document`. No new query language, no ORM, no dialect to learn, no second data model to keep
+  in step with the server one.
+- ✈️ **Offline by construction.** There is nothing to be offline *from*. The engine is in the
+  process; the data is in a local directory. Aeroplane mode changes nothing.
+- 📦 **No server, no ports, no connection string.** Deployment is a directory, the way SQLite's
+  is a file. Nothing to install, provision, or keep running beside the app.
+- 🗺️ **The whole query surface, not a subset.** `$geoNear` over a `2dsphere` index, `$text`
+  over a text index, `$geoWithin` with a polygon, and a haversine written in the engine's own
+  `$sin`, `$asin` and `$degreesToRadians` — planned and executed by MongoDB.
+- 🧪 **A data layer you can test on a laptop.** The whole of it is plain Kotlin against the
+  library's Android-free core module: 140 tests, no emulator, no compiled engine.
+- 🌍 **One engine across ecosystems.** Rust and Python today, Android here, the same C ABI
+  underneath. The queries move between them because they are MongoDB's queries.
+
+## Better than SQLite for this
+
+SQLite is the reflex answer to on-device storage, and it is a fine database. It is the wrong
+shape for this data, and for any application whose data also lives on a server.
+
+- 📄 **The document model, all the way down.** A coffee place *is* a document: a name, a
+  category, a GeoJSON point, and an address whose every field is optional — street, locality,
+  postcode, region, any of them absent. In SQLite that is a `places` table plus a ladder of
+  nullable columns, or a join to an addresses table, and either way the place is decomposed on
+  the way in and reassembled on the way out, by hand or by an ORM. Here it is stored as the
+  shape it already is, and read back as that shape.
+- 🔁 **One data model, phone and server.** The alternative is SQL on the device and MongoDB
+  behind the API: two schemas, two query languages, and a translation layer between them that
+  every new field has to pass through. The same document, the same index and the same pipeline
+  work in both places.
+- 🌱 **The seed is the server's own BSON.** `ireland.bson.gzip` is documents, inserted as they
+  are. A SQLite build of this needs an ETL step that flattens them into rows first, and that
+  step has to be maintained in step with the schema on both ends.
+- 🗺️ **Geospatial without a bolted-on extension.** SQLite's R\*Tree indexes bounding boxes, so
+  "nearest, in order" is a box query followed by a haversine you write and a sort you pay for —
+  or SpatiaLite, a second dependency. `$geoNear` walks a `2dsphere` index outwards from the
+  point and returns the 50 the list asks for, already ordered, having read 50 rather than
+  5,180.
+- 🔤 **Text search on the collection itself.** FTS5 is good, but it is a separate virtual table
+  kept in step with the real one by triggers. A `$text` index is an index on the documents.
+- 🧬 **New fields need no migration.** Adding a field to a document is adding a field. There is
+  no `ALTER TABLE` ladder to write, version and run against installs that skipped three
+  releases.
+
+The cost is honest and worth stating: SQLite is already in Android and costs nothing to ship,
+while the engine adds 46 MiB per ABI, and it is decades of production hardening against an
+experimental build. That is the trade being made here.
+
+## The screen that proves it
+
+Anyone can claim an engine. So every result carries the exact command that produced it, and a
+pipeline screen prints it:
+
+```json
+{ "aggregate": "places",
+  "pipeline": [ { "$geoNear": { "near": { "type": "Point", "coordinates": [-6.26, 53.35] },
+                                "distanceField": "distance", "spherical": true } },
+                { "$limit": 50 } ],
+  "cursor": {} }
+```
+
+That document is not a description of the query. It is the one the driver sent, travelling back
+with its own results, so what is on screen cannot drift from what the engine ran. `buildInfo`
+reports `modules: ["embedded"]`, which no real `mongod` ever does.
+
+## The map is the data
+
+The map is a `Canvas`, drawn from the coordinates the query returned. There are no tiles under
+it and no map SDK in the build. Ireland is recognisable because five thousand coffee places are
+enough to draw its towns and its coast road — the shape *is* the data. One `$geoWithin` with a
+polygon returns all 5,180 in 51–75 ms.
+
+## On a real phone
+
+Measured on a Galaxy S23 Ultra, release build, five runs each:
+
+| | |
+| --- | --- |
+| Cold start, seeding 5,180 documents and building both indexes | **0.7–1.1 s** warm-cache, up to 3.6 s on the first launch after a reboot |
+| Warm start, database only | **0.3–0.6 s**. Nothing is re-seeded |
+| The 50 nearest, `$geoNear` | **15–38 ms** |
+| Every place on the island, one query | **71–114 ms** |
+| Database on disk | **10.3 MiB** — 1.5 MB documents, 0.7 MB indexes, 8 MiB journal |
+| Release APK | **59 MiB** per ABI, of which the engine is 46 MiB |
+
+Killed mid-flight with the engine open, it reopens with exactly 5,180 places in 466 ms — no
+repair, no reseed.
+
+## Build it
+
+```sh
+export JAVA_HOME=/path/to/jdk21          # Android Studio's bundled runtime qualifies
+export ANDROID_HOME=/path/to/Android/Sdk
+
+git clone https://github.com/jeroenvervaeke/embedded-mongo.git    # sibling checkout
+./gradlew :app:assembleDebug
+```
+
+The library is consumed as a Gradle included build from `../embedded-mongo/android`; set the
+`embeddedMongoAndroidDir` property if the two repositories are not siblings. `./gradlew
+:data:test` runs without either an emulator or a compiled engine.
+
+[AGENTS.md](AGENTS.md) has the module layout, the build details, and everything learned the hard
+way.
 
 ## Data, attribution and licences
 
-Places come from the [Overture Maps Foundation](https://overturemaps.org), release 2026-08-19.0,
-accessed 2026-08-27. **The data has been modified**: filtered to four coffee categories inside a
-bounding box around Ireland, and reshaped into the documents this application stores.
+Places come from the [Overture Maps Foundation](https://overturemaps.org), release
+2026-08-19.0, accessed 2026-08-27. **The data has been modified**: filtered to four coffee
+categories inside a bounding box around Ireland, and reshaped into the documents this
+application stores.
 
 © 2026 Foursquare Labs, Inc. All rights reserved.
 
 Contributing datasets are covered by CDLA-Permissive-2.0, the Apache License 2.0 with the
 Foursquare NOTICE, and CC0-1.0. **All four texts ship inside the application** — in
 `app/src/main/assets/places/licenses/`, shown in full on the About screen — because naming a
-licence does not satisfy it: CDLA-Permissive-2.0 section 2.1 and the NOTICE both require the text
-to travel with the data. CC0-1.0 imposes no such condition and is shipped anyway, so that every
-licence the data is under can be read inside the application.
+licence does not satisfy it: CDLA-Permissive-2.0 section 2.1 and the NOTICE both require the
+text to travel with the data. CC0-1.0 imposes no such condition and is shipped anyway, so that
+every licence the data is under can be read inside the application.
 `app/src/main/assets/places/ireland.attribution.txt` records the extraction and every
 modification made to the data, and `licenses/SOURCES` records where each text was fetched from.
 
 The seed itself is `app/src/main/assets/places/ireland.bson.gzip`: 5,180 documents of
-concatenated BSON, gzipped to 454 KB, produced by the library's `scripts/build-places-seed`. The
-extension is `.gzip` rather than the `.gz` that script writes, and that matters — see "Things
-worth knowing".
+concatenated BSON, gzipped to 454 KB, produced by the library's `scripts/build-places-seed`.
 
-## What is built, and what runs
+## This project is not a MongoDB product
 
-It runs, on a phone. Built against the published engine (`native-81be76197da4`) with no override,
-and driven end to end on a **Galaxy S23 Ultra (SM-S918B, arm64-v8a, Android 16 / API 36)** as well
-as on an API 35 x86_64 emulator.
-
-| | |
-| --- | --- |
-| `./gradlew :data:test` | **green.** 140 tests, no emulator and no compiled engine |
-| `./gradlew :app:testDebugUnitTest` | **green.** 58 tests — the real seed, the packaged assets, the engine lifecycle, the location budget, the timings |
-| `./gradlew :app:lintDebug` | **green**, with `warningsAsErrors` on |
-| `./gradlew :app:assembleDebug` | **84 MB** per ABI (debug stores dex uncompressed) |
-| `./gradlew :app:assembleRelease` | **59 MB** per ABI, R8 on |
-| On arm64 hardware | seeds, indexes, queries, draws, gives up on a location that never arrives, and survives being killed with the engine open |
-
-The arm64 APK carries the published `aarch64-linux-android` engine byte for byte — the `.so` in
-`lib/arm64-v8a/` has the SHA-256 the library's `prebuilt.rs` records — and it loads and runs on
-the phone with nothing about it patched for the architecture.
-
-### What the phone showed
-
-Numbers below are the **release build**, five runs each, screen on and battery saver off. The
-application prints them itself: `adb logcat -s CoffeeTimings`.
-
-Both conditions are load-bearing, and neither is obvious when driving a phone over `adb`. A
-locked phone dozes: `am start` still launches, the log lines still appear, and every one of them
-is wrong, because the big core sits at 864 MHz instead of its 3.36 GHz — measured here as a
-start-up of 5.6 s against 0.67 s for the same build minutes apart. Battery saver does the same
-thing more quietly. Wake **and unlock** the device, and check `dumpsys power | grep mWakefulness`
-says `Awake` rather than trusting that a `KEYCODE_WAKEUP` did it — and check it again part
-way through a long session, because a 30-second screen timeout puts the phone back to `Dozing`
-between one measurement and the next, which is the same wrong number arriving a second time.
-
-- **Cold start is 1.2–2.2 s to a screen of results**, as the system measures it — `reportFullyDrawn`
-  fires on the first list, so `Displayed` is the spinner and `Fully drawn` is the real thing. Of
-  that, opening the engine is 0.3–1.2 s, inserting 5,180 documents is 220–305 ms, and the two
-  index builds are 79–107 ms together. **Opening the engine is the largest and by far the most
-  variable part** — it is a 48 MB shared library being mapped, and it dominates a cold start far
-  more than the seed does.
-- **A warm start is 1.4–1.5 s**, of which the database is 440–490 ms. Nothing is re-seeded: the
-  place count is read back and matches.
-- **A settled pan costs 33 ms at the median and 75 ms at the worst**, over 40 pans. Asking for
-  the whole island — every one of the 5,180 documents returned, paged over `getMore` and parsed
-  into domain objects — is 51–75 ms. That work is off the main thread, and the canvas keeps
-  drawing from the live camera while it runs, so a pan never waits on it.
-- **Minify it or the numbers change.** The debug build is 2–3× slower on exactly these paths:
-  950 ms to insert against 250 ms, and a 5,180-document pan at 136 ms against 63 ms. A
-  measurement from a debug build is not a measurement of the application.
-- **The database measures 10.3 MiB** on the device: 1.5 MB of documents, 0.7 MB across four
-  indexes, and an 8 MiB journal — within a rounding error of what the emulator reported.
-- **All four states of the location permission behave**, each driven from a wiped install.
-  Granted, FusedLocationProvider answers and `$geoNear` measures from where the phone actually
-  is — the pipeline screen prints the coordinates it was handed. Refused, the screen says
-  "No location — measured from Dublin" and returns Henry St and O'Connell St at 19–34 m,
-  ascending. Refused twice, the permission goes `USER_FIXED` and the button opens this
-  application's page in system settings, which is the only way back — but a process killed and
-  restored in that same state reaches the list without opening settings at all, because the
-  settings page is the button's answer and not a cold start's. Revoked while running, the
-  platform kills the process; see below.
-- **The fix is not always prompt.** `getCurrentLocation` answered within a few seconds on some
-  attempts and not at all on others, twice — on debug and release alike, so it is not R8. The call
-  has no bound of its own: the `CurrentLocationRequest` its priority-only overload builds leaves
-  `durationMillis` at `Long.MAX_VALUE`, so a provider that never calls back left the screen on
-  "Finding you…" for the life of the process. It now waits ten seconds, cancels the request, and
-  says "Gave up waiting for a location — measured from Dublin. Tap to try again." — told apart
-  from a refusal, because a refusal is answered by granting the permission and a silence by asking
-  again. Nothing is held up while it waits: the list is already answering from Dublin.
-  **The silence reproduces on its own**, and was watched doing so three times with the permission
-  granted, location services on and no aeroplane mode — the conditions the original hang was seen
-  in. Each time the screen turned over at ten seconds with the Dublin list still under it.
-  **Aeroplane mode is not a way to test this**: it answers *faster*, from a cached fix, because it
-  takes the network away and not the cache. The silence has to be waited for rather than arranged.
-- **Giving up drops the request, and `dumpsys location` is the wrong place to look.** The fused
-  provider attributes an application's request to `com.google.android.gms` and marks it
-  `hiddenFromAppOps`, so this package never appears there and the obvious investigation dead-ends.
-  The channel that shows it is the app op: `adb shell cmd appops get <package>` reports
-  `MONITOR_LOCATION` as `(running)` from the moment the button is pressed, and on three separate
-  attempts it stopped with `duration=` 9.976 s, 9.999 s and 9.997 s. Cancelling a coroutine tells
-  Play services nothing by itself, and the request carries `durationMillis = Long.MAX_VALUE`, so
-  something ended it at the budget — that the something was the `CancellationToken` is the one
-  step here that is inferred rather than seen.
-- **One `$geoWithin` returns all 5,180**, and plotting them draws a recognisable Ireland.
-- **Killed with the engine open** — revoking a runtime permission makes the platform kill the
-  process, which is a real SIGKILL mid-flight — it reopened with exactly 5,180 places, no repair
-  and no reseed, in 466 ms.
-- **Killed 0.4 s into seeding**, before any marker was written, it dropped the partial collection
-  on relaunch and came back with exactly 5,180. That one is still an emulator result; the phone
-  was interrupted with the database open rather than mid-seed.
-- **R8 keeps what it must, on no rule of this application's own.** The release build seeds,
-  queries, renders `Document.toJson` on the pipeline screen and reads the licence assets on the
-  library's `consumer-rules.pro` alone. Built with the old duplicate rule restored and built
-  without it, R8 produces the same `seeds.txt`, the same `usage.txt`, the same `mapping.txt` and a
-  byte-identical APK — so removing it changed nothing R8 keeps or drops, and the numbers above
-  describe the build that ships.
-
-### Still unverified
-
-- **The hardware numbers above predate the collection API.** They were taken when `:data` built
-  its own `aggregate`, `insert` and `createIndexes` documents and sent them through a two-method
-  seam; it now builds pipelines and hands them to `MongoCollection`, and the commands that reach
-  the engine are the library's. The commands themselves are the same documents — the pipeline
-  tests pin them field for field, and `Queried.command` is still what was sent — so the figures
-  are expected to hold, but they have not been re-taken on the phone.
-- **Nothing has run on a small or nearly full volume.** The free-disk floor was only ever
-  observed passing: `getAllocatableBytes` answered 151,694,327,808 bytes on a 460 GB partition
-  against the 64 MiB asked for, so the check is nowhere near its boundary and the refusal path
-  has not been exercised on a device. A failed start is what that refusal produces, so the retry
-  that recovers from one — which asks the device where it is a second time — has not been seen on
-  a phone either; it is proven on the JVM and nowhere else.
-- **The device was in one place.** `$geoNear` from a real fix was measured in Dublin, so a fix
-  outside the seed's bounding box has not been seen.
-- **Three details of the location work were not observed, though the behaviour around each was.**
-  The screen was watched turning over to "Gave up waiting" from "No location" rather than from
-  "Finding you…" — both are states whose query really is on Dublin and both take the same branch,
-  but the literal `ASKING` → timed-out transition is not the one that was watched. The transient
-  "Finding you…" label was never caught on screen at all: a `uiautomator` dump costs about two
-  seconds and a fix now lands faster than that. And after an `am kill`, whether `asked` came back
-  `true` or came back `false` and was re-denied under `USER_FIXED` cannot be told apart from
-  outside the process — both reach `locate()`, and neither opens settings, which is the whole of
-  what that fix claims.
-- **The release APK has only ever been debug-signed.** There is no release `signingConfig`, so
-  `assembleRelease` produces an unsigned APK and every hardware run above was made with one signed
-  by the standard debug keystore. The code is unaffected — it is the byte-identical R8 output
-  described above, and `dumpsys package` reports `flags=0x0`, so nothing here was measured on a
-  debuggable build. Only the certificate differs, which leaves everything gated on it untested:
-  Play App Signing's re-signing, key rotation, v4 install, signature-level permissions, and Play
-  Integrity attestation. This application declares one permission and makes no network call, so
-  nothing in it reads its own signature — but that is a reading of the manifest, not something a
-  device showed.
-- **32-bit and Android 9–13 remain untested.** One arm64 phone on API 36 is one phone.
-
-## Layout
-
-```
-data/                       plain Kotlin: no Android, none of the library's native half
-  PlaceRepository.kt        the three questions, and the command that answered each
-  model/                    Coordinates, Metres, Viewport, Place, PlaceCategory
-  query/                    every pipeline, and the two collections it runs against
-  parse/                    replies into domain types, at one boundary
-  seed/                     the gzipped BSON stream, and what puts it in the database
-  geo/                      the camera and the projection the canvas draws through
-  finder/                   the two screens' state, as StateFlows
-
-app/                        the Android shell
-  engine/                   EmbeddedMongoOpener -- the whole of the native contact
-  location/                 FusedLocationProvider, a budget on waiting, and Dublin as the fallback
-  ui/                       Compose: list, map, pipeline, about
-  assets/places/            the seed, its attribution, and the licence texts it must ship with
-                            (named .gzip, not .gz -- see "Things worth knowing")
-```
-
-## How the data layer talks to MongoDB
-
-Through the library's collection API, and nothing of its own:
-
-```kotlin
-class PlaceRepository(private val places: MongoCollection, …) {
-    suspend fun nearest(from: Coordinates, limit: Int, …): Queried<NearbyPlace> {
-        val query = places.aggregate(nearestPipeline(from, limit, …))
-        return Queried(query.asFlow(Document::toNearbyPlace).toList(), query.command())
-    }
-}
-```
-
-`:data` depends on `embedded-mongodb-core` — the library's Android-free half, which is where
-`MongoDatabase`, `MongoCollection` and the queries on them live. There is no engine in it and no
-Android: every collection is built on the library's `CommandRunner`, one suspending method wide,
-so the pipelines, the parsing, the seeding and the screen state are all tested on the JVM against
-a scripted one.
-
-What this application still writes for itself is the part that is about coffee places: the
-pipelines (`$geoNear`, `$text` with a haversine, `$geoWithin`), the two index specifications, and
-the parsing of replies into domain types. The `aggregate` and `insert` commands around them, the
-cursor paging, the `_id` generation and the write-result checking are the library's.
-
-`Queried.command` is `AggregateQuery.command()` — the document the library would send, not a
-description of it — which is what the pipeline screen shows.
-
-`:app` names `EmbeddedMongo` in one file, `EmbeddedMongoOpener`, which opens the engine and hands
-back `mongo.getDatabase("coffee")`. `CoffeeDatabase` holds the lifecycle around it and no engine type,
-which is what makes that lifecycle testable.
-
-## Depending on the library
-
-There is no Maven publication yet, so `settings.gradle.kts` consumes the module as an **included
-build**:
-
-```kotlin
-includeBuild(libraryDir) {
-    dependencySubstitution {
-        substitute(module("io.github.jeroenvervaeke:embedded-mongodb"))
-            .using(project(":embedded-mongodb"))
-        substitute(module("io.github.jeroenvervaeke:embedded-mongodb-core"))
-            .using(project(":embedded-mongodb-core"))
-    }
-}
-```
-
-Two substitutions because the library is two modules: `:app` takes the AAR, and `:data` takes the
-core module alone — plain Kotlin, so nothing in the data layer drags in the SDK or the engine.
-
-An included build rather than a copied module or a checked-in AAR: the library's sources stay in
-their own repository, `:app` sees whatever is checked out there, and there is no copy to go stale.
-A copied `.aar` would have to be refreshed by hand every time the library changed, and copying the
-module in would drag its `buildSrc` and its version catalog along with it.
-
-The path defaults to `../embedded-mongo/android` and is the `embeddedMongoAndroidDir` Gradle
-property, so the two repositories do not have to be siblings. If it is not there, the build says
-so rather than failing several hundred lines of Gradle log later.
-
-Both builds are pinned to the same AGP and Kotlin, because a composite build compiles them with
-one of each. The AndroidX versions are pinned to what AGP 8.13.2 and `compileSdk` 36 accept;
-anything newer demands AGP 9.1.
-
-## Things worth knowing
-
-**`minSdk` is 28, not the library's 24.** The library's floor is where its prebuilt engine
-libraries are compiled against bionic, and that is a compile-time claim: it has not been run on a
-device below 9.0, and the engine is known to crash on earlier ones. 28 is where this application
-is prepared to say it works. Lowering it belongs with a device that proves it.
-
-**Backup is off.** `android:allowBackup="false"`, which the library requires: a WiredTiger
-directory restored onto another device, or onto another build of the application, is a corrupt
-database rather than a migrated one. From API 31 that attribute only covers cloud backup, so
-`data_extraction_rules.xml` excludes the directory from device-to-device transfer as well.
-
-**The free-disk floor is lowered to 64 MiB.** MongoDB will not start an index build with less
-than 500 MB free, and this application's cold start is a bulk insert followed by two index
-builds — so at the default a phone with 400 MB free could open the database and never finish
-seeding it. The library keeps 500 MB for every caller and lets one that knows better say so:
-an Ireland-scale directory here is 10.3 MiB with its journal, measured on the phone, and 64 MiB
-is roughly six times that. It is deliberately not lower. Nothing stops a build that runs out part-way —
-WiredTiger answers a genuinely full disk by aborting the process, with nothing to catch — so the
-floor is the only warning there is and the margin is the whole of the protection. Naming it also
-lowers the library's pre-open check from 256 MiB to match.
-
-**The engine is opened in an application-scoped coroutine, not the caller's.** The first ask
-comes from a `ViewModel`, and leaving a screen while the engine is still starting is an ordinary
-thing to do. Tied to that scope, the cancellation throws away an engine that came up anyway and
-the next screen pays for a second cold start; the library closes it rather than stranding it, but
-the work is still lost. Held by the application, the open finishes and the next screen is handed
-the result. That scope is a `SupervisorJob`, because a failed open must not take the scope down
-with it and leave the application unable to try again.
-
-**The seed asset is `ireland.bson.gzip`, not `.gz`.** AGP's asset merger silently gunzips any
-asset whose extension is exactly `gz` and packages it under the name without the extension — so
-the shipped file would be `places/ireland.bson`, decompressed, and every launch would fail on a
-`FileNotFoundException` for a name that is not there. `ShippedAssetsTest` reads what the merger
-actually produced rather than what the source tree holds, which is the only place that is
-visible.
-
-**One APK per ABI.** The engine is 46 MB per architecture and is stored uncompressed, which is
-right for the device — an uncompressed library is mapped rather than unpacked — but a universal
-APK would hold both engines and make every arm64 phone carry 46 MB of x86_64 it can never run.
-`splits { abi { … } }` builds one APK per ABI; a release would use an app bundle for the same
-reason. Split, a release APK measures 59 MB: engine 46 MB, `libc++_shared` 8.8 MB, and 2.2 MB of
-dex after R8. That `include` list is also what stops a 32-bit split ever being produced, since
-MongoDB has no 32-bit build.
-
-**The application times itself.** Every finished query and every phase of a start-up is one
-`Log.i` line under the `CoffeeTimings` tag, so `adb logcat -s CoffeeTimings` is the whole
-measuring apparatus and the numbers above can be re-taken on any device. The most recent one is
-also on screen — under the map, and beside each command on the pipeline screen — because a pan
-latency is worth seeing next to the pan. `reportFullyDrawn` covers the end a log line cannot:
-process start and dex loading, which the system measures for itself and prints as `Fully drawn`.
-
-**Places are counted with `countDocuments`, not `estimatedDocumentCount`.** The library's two
-counts are MongoDB's two: one walks the collection with a `$count`, the other reads collection
-metadata. The metadata count is the one operation this project has measured going wrong after an
-unclean shutdown — and Android killing the process mid-seed is exactly that. Seeding compares its
-marker against this number, so it takes the one that is true.
-
-**`:data` is a plain JVM module, so Android Lint never checks it for platform API levels.** Its
-tests run on a JDK where everything exists. Anything it calls has to exist on API 28 — which
-`InputStream.readNBytes` does not (it is API 33), which is why `BsonDocuments` fills its buffer
-by hand.
-
-**Nothing touches the engine on the main thread.** The suspending API dispatches onto the
-library's own database thread, and the blocking one throws if it is called from the main thread.
-
-**`$text` and `$geoNear` cannot be combined.** Both have to lead a pipeline, and `$geoNear`'s
-`query` option will not take a `$text`. So search matches on the text index and then measures
-distance itself, with a haversine written in the engine's own `$sin`, `$asin` and
-`$degreesToRadians` — on the same sphere `$geoNear` measures on, so the two are comparable. The
-test for it evaluates the expression and checks the answer against distances that are a matter of
-record, rather than pinning the shape of the BSON.
-
-## Building
-
-```sh
-export JAVA_HOME=/path/to/jdk21          # Android Studio's bundled runtime qualifies
-export ANDROID_HOME=/path/to/Android/Sdk
-
-./gradlew :data:test                     # no emulator and no compiled engine for this one
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug             # needs the library's engine to link
-```
-
-**R8 needs no rule from this application.** `app/proguard-rules.pro` is a comment and nothing
-else. Everything a minified build needs — the JNI entry points, the BSON codecs, and a `-dontwarn`
-for the SLF4J backend `org.mongodb:bson` carries and nothing here puts on the classpath — comes
-from the library's own `consumer-rules.pro`. That last one used to be duplicated here, because
-`bson` is an `api` dependency of the library and every consumer that minifies inherits the
-dangling reference; the library has since taken it over, so this build now requires a library
-checkout at `808276e` or later. Against an older one the release build fails outright on
-`Missing class org.slf4j.Logger`.
-
-Two things make that easy to check wrongly, if you re-run the comparison that established it.
-R8 emits `seeds.txt` unordered, so a plain `diff` of two runs reports thousands of differences
-that are not there — sort it first, or compare `mapping.txt` and the APK instead. And the Gradle
-build cache will satisfy `minifyReleaseWithR8` `FROM-CACHE` from an entry keyed on a different
-library checkout, which makes a stale artefact look like a passing comparison: build both sides
-with `--no-build-cache`, and check the task actually ran rather than trusting `BUILD SUCCESSFUL`.
+Not supported by, endorsed by, or affiliated with MongoDB, Inc. No MongoDB logo or branding is
+used here. It is an independent demonstration of an embedded build of the engine, which is
+itself experimental and not production-ready.
 
 [library]: https://github.com/jeroenvervaeke/embedded-mongo

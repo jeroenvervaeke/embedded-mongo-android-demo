@@ -49,6 +49,12 @@ android {
 
     buildTypes {
         release {
+            // Signed with the debug keystore so `assembleRelease` produces an APK that installs.
+            // This is a demo that is sideloaded, not published, so there is no release key to
+            // hold; anything gated on the certificate -- Play App Signing, key rotation, Play
+            // Integrity -- is out of reach until there is one.
+            signingConfig = signingConfigs.getByName("debug")
+
             // The library ships consumer-rules.pro, which keeps the JNI entry points and the BSON
             // codecs R8 would otherwise rename or strip.
             isMinifyEnabled = true
