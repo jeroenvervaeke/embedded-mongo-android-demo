@@ -23,7 +23,8 @@ const val NAME_INDEX = "name_brand_text"
 fun placeIndexes(): List<IndexModel> = listOf(
     IndexModel(Indexes.geo2dsphere("loc"), IndexOptions(name = LOCATION_INDEX)),
     IndexModel(
-        Indexes.text("name", "brand"),
+        // One compound text index rather than two, because a collection may hold only one.
+        Indexes.compoundIndex(Indexes.text("name"), Indexes.text("brand")),
         IndexOptions(name = NAME_INDEX, weights = Document("name", 10).append("brand", 5)),
     ),
 )

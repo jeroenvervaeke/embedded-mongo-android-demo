@@ -200,7 +200,7 @@ Through the library's collection API, and nothing of its own:
 class PlaceRepository(private val places: MongoCollection, …) {
     suspend fun nearest(from: Coordinates, limit: Int, …): Queried<NearbyPlace> {
         val query = places.aggregate(nearestPipeline(from, limit, …))
-        return Queried(query.asFlow().map(Document::toNearbyPlace).toList(), query.command())
+        return Queried(query.asFlow(Document::toNearbyPlace).toList(), query.command())
     }
 }
 ```
@@ -220,7 +220,7 @@ cursor paging, the `_id` generation and the write-result checking are the librar
 description of it — which is what the pipeline screen shows.
 
 `:app` names `EmbeddedMongo` in one file, `EmbeddedMongoOpener`, which opens the engine and hands
-back `mongo.database("coffee")`. `CoffeeDatabase` holds the lifecycle around it and no engine type,
+back `mongo.getDatabase("coffee")`. `CoffeeDatabase` holds the lifecycle around it and no engine type,
 which is what makes that lifecycle testable.
 
 ## Depending on the library

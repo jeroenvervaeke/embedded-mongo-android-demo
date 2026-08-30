@@ -17,9 +17,9 @@ const val SEED_COLLECTION = "seed"
  * A `MongoCollection` is a name and a way to run commands, so making one costs nothing and these
  * are functions rather than something cached.
  */
-fun MongoDatabase.places(): MongoCollection = collection(PLACES_COLLECTION)
+fun MongoDatabase.places(): MongoCollection = getCollection(PLACES_COLLECTION)
 
-fun MongoDatabase.seedMarkers(): MongoCollection = collection(SEED_COLLECTION)
+fun MongoDatabase.seedMarkers(): MongoCollection = getCollection(SEED_COLLECTION)
 
 /**
  * The field a geo query writes its distance into. `$geoNear` names it in `distanceField`, and the

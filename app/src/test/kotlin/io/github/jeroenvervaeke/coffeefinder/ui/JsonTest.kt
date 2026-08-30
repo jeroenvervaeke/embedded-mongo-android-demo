@@ -61,6 +61,6 @@ private fun nearestQuery(
     maxDistance: Metres? = null,
     category: PlaceCategory? = null,
 ): Document = MongoDatabase(CommandRunner { _, _ -> Document() }, "coffee")
-    .collection("places")
+    .getCollection("places")
     .aggregate(nearestPipeline(from, limit, maxDistance, category))
     .command()

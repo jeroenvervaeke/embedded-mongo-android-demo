@@ -22,7 +22,7 @@ class EmbeddedMongoOpener(private val context: Context) : DatabaseOpener {
     override suspend fun open(directory: File, options: StorageOptions): OpenDatabase {
         val engine = EmbeddedMongo.open(context, directory, options)
         return object : OpenDatabase {
-            override val mongo: MongoDatabase = engine.database(COFFEE_DATABASE)
+            override val mongo: MongoDatabase = engine.getDatabase(COFFEE_DATABASE)
 
             override fun close() = engine.close()
         }
