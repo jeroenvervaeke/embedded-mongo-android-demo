@@ -11,7 +11,7 @@ import java.io.File
  * Opens the real engine, and is the whole of this application's contact with the native library.
  *
  * Deliberately this short. Naming the directory, the storage limits and the database is all there
- * is to do — everything above it is [MongoDatabase] and the collections on it, which are plain
+ * is to do: everything above it is [MongoDatabase] and the collections on it, which are plain
  * Kotlin and live in `:data` where they are tested without an engine at all.
  *
  * The [Context] overload of `open`, not the one without: only that one can ask the platform how

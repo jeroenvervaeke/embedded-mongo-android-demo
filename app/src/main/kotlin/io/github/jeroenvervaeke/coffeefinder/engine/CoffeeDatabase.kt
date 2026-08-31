@@ -18,13 +18,13 @@ import kotlinx.coroutines.withContext
  *
  * The engine allows one runtime per process, so opening is behind a mutex rather than left to
  * whichever screen asks first. Its directory is named here and excluded from backup in the
- * manifest by the same name — a restored WiredTiger directory is corrupt, not migrated.
+ * manifest by the same name: a restored WiredTiger directory is corrupt, not migrated.
  *
  * The open runs in [scope], which belongs to the application, rather than in the coroutine that
  * happened to ask first. That is deliberate: the first ask comes from a `ViewModel`, whose scope
  * dies when the screen does, and leaving a screen while the engine is starting is an ordinary
- * thing to do. Tied to the caller, that cancellation throws away an engine that came up anyway —
- * the library closes it rather than stranding it, but the next screen then pays for a second
+ * thing to do. Tied to the caller, that cancellation throws away an engine that came up anyway.
+ * The library closes it rather than stranding it, but the next screen then pays for a second
  * cold start. Held here, the open finishes and the next screen is handed the result.
  */
 class CoffeeDatabase(
@@ -41,8 +41,8 @@ class CoffeeDatabase(
     /**
      * Closes the database, waiting for an open in flight rather than racing it.
      *
-     * Never called by this application — Android ends the process instead, and a journalled write
-     * has nothing left to flush — but a database that cannot be closed is a database that cannot
+     * Never called by this application (Android ends the process instead, and a journalled write
+     * has nothing left to flush), but a database that cannot be closed is a database that cannot
      * be reopened, so it is here and it is correct.
      */
     suspend fun close() = withContext(NonCancellable) {
@@ -89,14 +89,14 @@ const val COFFEE_DIRECTORY = "coffee"
  *
  * MongoDB will not start an index build with less than 500 MB free, and this application's cold
  * start is a bulk insert followed by two index builds. That default is sized for a server. The
- * whole directory here measures 10.3 MiB on a phone — 1.5 MB of documents, 0.7 MB across four
- * indexes, and an 8 MiB journal — so at the default a phone with 400 MB free could open the
+ * whole directory here measures 10.3 MiB on a phone (1.5 MB of documents, 0.7 MB across four
+ * indexes, and an 8 MiB journal), so at the default a phone with 400 MB free could open the
  * database and never finish seeding it, failing `createIndexes` with `OutOfDiskSpace` on every
  * launch.
  *
  * 64 MiB is about six times that, which is the shape the library asks for: lower it to what the
  * work about to be done actually needs, not to what will fit. It is deliberately not lower. The
- * floor is a pre-flight check and the only warning there is — nothing stops a build that runs out
+ * floor is a pre-flight check and the only warning there is: nothing stops a build that runs out
  * part-way, and WiredTiger answers a genuinely full disk by aborting the process, with no
  * exception to catch. The margin is the whole of the protection.
  *

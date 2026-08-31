@@ -34,8 +34,7 @@ fun Credits(modifier: Modifier = Modifier) {
         Column {
             Text("Jeroen Vervaeke", style = MaterialTheme.typography.titleLarge, color = Console.Mist)
             Text(
-                text = "Built and measured by Jeroen Vervaeke — the application, and the " +
-                    "embedded-mongodb library it runs on.",
+                text = "Built the application, and the embedded-mongodb library it runs on.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Console.Label,
                 modifier = Modifier.padding(top = 5.dp),
@@ -43,14 +42,14 @@ fun Credits(modifier: Modifier = Modifier) {
 
             Credit(
                 title = "embedded-mongodb",
-                detail = "github.com/jeroenvervaeke/embedded-mongo — MongoDB's engine, built for " +
+                detail = "github.com/jeroenvervaeke/embedded-mongo: MongoDB's engine, built for " +
                     "Android and driven over a JNI bridge. This application consumes it as an " +
                     "included build and owns none of the query machinery: the aggregate command, " +
                     "the cursor paging and the write checking are all the library's.",
             )
             Credit(
                 title = "Overture Maps Foundation",
-                detail = "overturemaps.org — places release 2026-08-19.0, accessed 2026-08-27, " +
+                detail = "overturemaps.org: places release 2026-08-19.0, accessed 2026-08-27, " +
                     "filtered to four coffee categories inside a box around Ireland and reshaped " +
                     "into the documents this application stores. © 2026 Foursquare Labs, Inc.",
             )

@@ -10,8 +10,8 @@ import org.bson.codecs.DecoderContext
 import org.bson.codecs.DocumentCodec
 
 /**
- * Reads a stream of concatenated BSON documents — the shape `mongodump` writes and the shape the
- * seed ships in — one document at a time.
+ * Reads a stream of concatenated BSON documents (the shape `mongodump` writes and the shape the
+ * seed ships in), one document at a time.
  *
  * There is no container around them, no count and no index: a BSON document begins with its own
  * length, so the stream is walked by reading four bytes and then that many. Lazily, because the
@@ -53,7 +53,7 @@ private fun InputStream.nextDocument(): Document? {
  *
  * Hand-rolled rather than `InputStream.readNBytes`, which looks like the obvious call and is
  * **API 33**: this application's floor is 28, so on every device between Android 9 and 12L that
- * method is a `NoSuchMethodError` at the first document of the seed. Nothing catches it here —
+ * method is a `NoSuchMethodError` at the first document of the seed. Nothing catches it here:
  * this module is plain Kotlin, so lint never checks it for platform APIs, and its tests run on a
  * JVM where the method exists. `read` has been there since API 1.
  *

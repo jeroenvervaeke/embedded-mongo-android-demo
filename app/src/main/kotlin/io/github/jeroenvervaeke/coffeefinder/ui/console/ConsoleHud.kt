@@ -53,7 +53,7 @@ data class ConsoleReadout(
  * it cost.
  *
  * It sits at the very top of the screen, under the status bar and nothing else. Tapping it opens
- * the stages a person can switch, and the command itself — read out of the reply that produced
+ * the stages a person can switch, and the command itself, read out of the reply that produced
  * the results, so the JSON here is the JSON that crossed the bridge.
  */
 @Composable

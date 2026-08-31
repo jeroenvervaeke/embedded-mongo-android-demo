@@ -28,8 +28,8 @@ data class PipelinePreset(val name: String, val text: String)
  * The pipelines the explorer opens with.
  *
  * The first three are built by the application's own query builders rather than written out
- * again here, so what a person starts editing is the pipeline the map and the list actually run
- * — down to the folded-in haversine constants. A preset that had been transcribed would be a
+ * again here, so what a person starts editing is the pipeline the map and the list actually run,
+ * down to the folded-in haversine constants. A preset that had been transcribed would be a
  * plausible copy, and drift the first time a builder changed.
  */
 val PIPELINE_PRESETS: List<PipelinePreset> = listOf(

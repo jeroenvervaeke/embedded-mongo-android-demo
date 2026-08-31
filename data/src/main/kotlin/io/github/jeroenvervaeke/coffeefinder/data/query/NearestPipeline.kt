@@ -9,8 +9,8 @@ import org.bson.Document
  *
  * `$geoNear` does the work the application would otherwise do badly: it walks the `2dsphere`
  * index outwards from the point, so it reads the [limit] documents it returns rather than all
- * 5,180 of them, and it emits them already ordered. It has to be the first stage — that index
- * walk is the source of the documents, not a filter over them — which is why [criteria] goes
+ * 5,180 of them, and it emits them already ordered. It has to be the first stage (that index
+ * walk is the source of the documents, not a filter over them), which is why [criteria] goes
  * into its own `query` option instead of into a `$match` in front of it.
  *
  * The `$limit` is a stage rather than `$geoNear`'s own deprecated `num`, and a `null` [limit]

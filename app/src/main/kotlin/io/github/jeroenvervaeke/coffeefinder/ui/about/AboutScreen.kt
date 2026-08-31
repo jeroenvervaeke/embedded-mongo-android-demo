@@ -72,7 +72,7 @@ fun AboutScreen(
         Text(
             text = "MongoDB's own storage engine runs in-process on the handset. Every query on " +
                 "these screens is a real aggregation pipeline, executed locally against a " +
-                "WiredTiger collection — the same engine and the same operators, with no cloud " +
+                "WiredTiger collection: the same engine and the same operators, with no cloud " +
                 "round trip and nothing to degrade when the signal goes.",
             style = MaterialTheme.typography.bodyMedium,
             color = Console.Label,
@@ -126,7 +126,7 @@ fun AboutScreen(
                     )
                     IndexNote(
                         name = "name_brand_text",
-                        description = "Weighted name:10, brand:5 — a shop's own name outranks the " +
+                        description = "Weighted name:10, brand:5, so a shop's own name outranks the " +
                             "chain it belongs to. \$text and \$geoNear both demand the first " +
                             "stage, so a text search measures distance with a haversine written " +
                             "in \$sin and \$asin instead.",

@@ -13,7 +13,7 @@ import kotlinx.coroutines.test.runTest
  * The budget itself, on virtual time.
  *
  * Every wait here costs nothing to run and is exact to the millisecond, which is what lets these
- * assert *when* the answer came as well as what it was — the difference between a test of a
+ * assert *when* the answer came as well as what it was: the difference between a test of a
  * timeout and a test that would pass without one.
  */
 class LocatorTest {

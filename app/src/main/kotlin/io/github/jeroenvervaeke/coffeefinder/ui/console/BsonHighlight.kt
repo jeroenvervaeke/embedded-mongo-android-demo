@@ -9,7 +9,7 @@ import io.github.jeroenvervaeke.coffeefinder.ui.theme.Console
 /**
  * JSON coloured the way a shell colours it: operators loud, keys next, values quiet.
  *
- * Regex rather than a parser, and that is the right size for the job — this colours text that has
+ * Regex rather than a parser, and that is the right size for the job: this colours text that has
  * already been produced by the BSON library's own writer, so it is known to be well formed and
  * nothing here has to decide what it means. A wrong colour is a wrong colour, not a wrong
  * document.

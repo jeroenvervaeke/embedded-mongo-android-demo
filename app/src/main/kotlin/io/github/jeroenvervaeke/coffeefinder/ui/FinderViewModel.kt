@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
  * Opens the database, seeds it, and hands the screens the two finders that query it.
  *
  * Almost nothing happens here: the finders are `:data` classes given [viewModelScope] to run in,
- * so what this class contributes is the Android part — the assets the seed comes from, and the
+ * so what this class contributes is the Android part: the assets the seed comes from, and the
  * device location the queries are measured from.
  */
 class FinderViewModel(application: Application) : AndroidViewModel(application) {
@@ -122,7 +122,7 @@ class FinderViewModel(application: Application) : AndroidViewModel(application) 
      *
      * Collected here rather than from a screen: a query runs whether or not the screen that asked
      * for it is on top, and a collector tied to a composition would miss exactly the ones that ran
-     * while it was not — which on the map is most of a gesture.
+     * while it was not, which on the map is most of a gesture.
      */
     private fun reportQueriesOf(ready: Startup.Ready) {
         viewModelScope.launch {

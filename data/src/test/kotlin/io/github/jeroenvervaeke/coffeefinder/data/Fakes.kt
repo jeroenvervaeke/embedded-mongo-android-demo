@@ -21,7 +21,7 @@ import org.bson.Document
  * A [CommandRunner] that answers from Kotlin and records what it was asked.
  *
  * The same seam the library's own tests use, one level up: there it stands in for the JNI bridge,
- * here for the whole engine. Everything above it — pipelines, parsing, seeding, screen state — is
+ * here for the whole engine. Everything above it (pipelines, parsing, seeding, screen state) is
  * therefore testable with no engine at all.
  *
  * [queryResults] answers the commands that open a cursor, wrapped in the reply shape the engine

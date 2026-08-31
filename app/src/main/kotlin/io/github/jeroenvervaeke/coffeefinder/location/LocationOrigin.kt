@@ -15,9 +15,9 @@ import kotlinx.coroutines.launch
  * Where the nearby query is measured from, and why.
  *
  * Plain Kotlin with a [CoroutineScope] handed to it rather than logic inside the `ViewModel`, for
- * the same reason as the finders: what is worth testing here — that a provider which never calls
+ * the same reason as the finders: what is worth testing here (that a provider which never calls
  * back is given up on, that giving up says so instead of claiming the device has no location, that
- * a second ask cannot be overtaken by the first — is testable on the JVM with virtual time, and an
+ * a second ask cannot be overtaken by the first) is testable on the JVM with virtual time, and an
  * `AndroidViewModel` is not.
  *
  * Not thread-safe, and does not need to be: [locate] and [pick] are called from the UI thread and
@@ -77,7 +77,7 @@ class LocationOrigin(
      * Measures from a point tapped on the map instead, and says so.
      *
      * The finder is moved here rather than by the caller, because [LocationSource.PICKED] is a
-     * claim about where the query is measured from and the two must not be able to disagree — the
+     * claim about where the query is measured from and the two must not be able to disagree: the
      * fallback labelling reads that claim and rewrites the screen on the strength of it.
      *
      * Cancelling is how a tap beats a fix that was already on its way. A guard on the state would

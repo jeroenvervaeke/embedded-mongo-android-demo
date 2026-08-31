@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.update
  *
  * The camera moves once per frame while a finger is on the screen, so the two filters in front of
  * the query matter more here than on the list. `debounce` waits for the gesture to stop, and
- * [showsSameAs] drops movement too small to change what is drawn — a pixel of drift on a released
+ * [showsSameAs] drops movement too small to change what is drawn: a pixel of drift on a released
  * finger would otherwise cost a full `$geoWithin` over the island.
  *
  * [camera] is published unfiltered, because the canvas redraws every frame from it while the
@@ -99,7 +99,7 @@ class MapFinder(
      *
      * What the console screen calls when it opens and when a location fix finally lands. A fix
      * that arrived after somebody had panned somewhere would otherwise pull the map out from
-     * under them — and so would coming back to the map tab, which composes the screen again.
+     * under them, and so would coming back to the map tab, which composes the screen again.
      */
     fun frameOnUnlessMoved(centre: Coordinates, radius: Metres) {
         if (!moved) frameOn(centre, radius)
@@ -115,7 +115,7 @@ class MapFinder(
     /**
      * The canvas reports its shape, because that is what decides how wide the viewport is.
      *
-     * While the island is what is framed, it is reframed to the new shape — which is what makes
+     * While the island is what is framed, it is reframed to the new shape, which is what makes
      * the view right on a tablet and after a rotation, not only on the portrait phone the default
      * assumes. Once something has framed something else, a resize only changes the viewport.
      */

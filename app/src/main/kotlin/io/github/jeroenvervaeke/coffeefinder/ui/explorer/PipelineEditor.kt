@@ -36,7 +36,7 @@ import io.github.jeroenvervaeke.coffeefinder.ui.theme.MONO_LABEL
  *
  * The colouring is a [VisualTransformation] rather than a second layer drawn behind the field.
  * It only adds spans, so the text it hands back is the text that was typed, character for
- * character — which is what keeps the cursor where the finger put it.
+ * character, which is what keeps the cursor where the finger put it.
  */
 @Composable
 fun PipelineEditor(text: String, onText: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -114,7 +114,7 @@ fun SnippetRow(
  * A stage dropped into a pipeline that is already there.
  *
  * Inserted before the closing bracket, with the comma the stage in front of it now needs. Text
- * rather than documents, because what is in the editor may not parse yet — this is a typing aid,
+ * rather than documents, because what is in the editor may not parse yet: this is a typing aid,
  * not an edit to a pipeline.
  */
 fun String.withStageAppended(stage: String): String {

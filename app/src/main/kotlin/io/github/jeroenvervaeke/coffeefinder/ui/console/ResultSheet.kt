@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
  *
  * One gesture, both directions. Dragging or tapping the count opens the list over the map;
  * dragging it back down returns to the map, with the count where it was. What is under the peek
- * — the search box, the view switch, the rows — is off the bottom of the screen while it is shut,
+ * (the search box, the view switch, the rows) is off the bottom of the screen while it is shut,
  * which is the point: a minimised map shows the map, the count, and nothing else.
  *
  * The grip and the peek are what drags, and they are on screen in both states: with the list up,

@@ -11,7 +11,7 @@ data class ExplainRow(val label: String, val value: String)
  * Everything here is optional, because an explain reply is shaped by the pipeline it explains:
  * a `$group` has no index to name, and a version of the engine may nest the same field somewhere
  * else. Anything not found is left out rather than guessed at, and the whole plan is printed
- * underneath either way — so this is a summary of a document that is also on screen, not a
+ * underneath either way, so this is a summary of a document that is also on screen, not a
  * substitute for it.
  */
 fun explainSummary(plan: Document): List<ExplainRow> {
@@ -34,7 +34,7 @@ fun explainSummary(plan: Document): List<ExplainRow> {
 /**
  * What the first stage of an aggregation explain holds, which is the plan for the query under it.
  *
- * The stage is named for what it is — `$cursor`, `$geoNearCursor` — so the name is read rather
+ * The stage is named for what it is (`$cursor`, `$geoNearCursor`), so the name is read rather
  * than assumed: a version of the engine that adds another kind of cursor stage still works here.
  */
 private fun Document.firstStagePlan(): Document? {
@@ -51,7 +51,7 @@ private fun List<Document>.firstValueOf(paths: List<List<String>>): String? =
  * A value several levels down, or `null` if any level is missing or is not a document.
  *
  * Written here rather than with `getEmbedded`, which throws when the path runs into something
- * that is not a document — and an explain plan is exactly the reply whose shape cannot be
+ * that is not a document, and an explain plan is exactly the reply whose shape cannot be
  * assumed.
  */
 private fun Document.path(vararg keys: String): String? {

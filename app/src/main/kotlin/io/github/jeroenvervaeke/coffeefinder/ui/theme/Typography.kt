@@ -29,7 +29,7 @@ val MONO_CODE = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp, l
  * reading, an index name and a stage are set in mono; a coffee shop's name is not. The headline
  * count is serif, because it is the one number the screen exists to say.
  *
- * The families are the platform's — no font files are bundled and none are fetched. An
+ * The families are the platform's: no font files are bundled and none are fetched. An
  * application whose point is that it makes no network call has no business downloading a
  * typeface, and 300 KB of woff2 per weight is a strange thing to ship to say "5,180".
  *

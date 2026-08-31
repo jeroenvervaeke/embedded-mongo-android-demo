@@ -25,9 +25,9 @@ import kotlinx.coroutines.flow.update
  * The console screen's state: what the user asked for, in, and coffee places out.
  *
  * Plain Kotlin with a [CoroutineScope] handed to it rather than an Android `ViewModel`, so the
- * behaviour that is actually worth testing — which query an empty search box runs, that dragging
+ * behaviour that is actually worth testing (which query an empty search box runs, that dragging
  * a radius does not run one query per pixel, that a failed query becomes a message rather than a
- * crash — is tested on the JVM with virtual time.
+ * crash) is tested on the JVM with virtual time.
  *
  * Two queries answer one screen: the `$count` behind the headline and the capped list under it.
  * They are built from the same request, so the number and the rows can never be answers to

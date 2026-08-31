@@ -21,7 +21,7 @@ value class Metres(val value: Double) {
      * decimal.
      *
      * In [locale], defaulting to the device's, because the only thing that calls this puts the
-     * result on screen — and a reader in France writes 1,2 km rather than 1.2 km. Tests pass
+     * result on screen, and a reader in France writes 1,2 km rather than 1.2 km. Tests pass
      * [Locale.ROOT] so that what they assert does not depend on the machine running them.
      */
     fun describe(locale: Locale = Locale.getDefault()): String {

@@ -29,7 +29,7 @@ import io.github.jeroenvervaeke.coffeefinder.ui.theme.MONO_LABEL
  * One result as a person reads it: what it is called, where it is, and how far the engine measured
  * it to be.
  *
- * The tile is generated from the name — see [tileBrush]. There are no photographs in this
+ * The tile is generated from the name (see [tileBrush]). There are no photographs in this
  * application and there is no way to fetch one, so a row that wanted an image had to draw it.
  */
 @Composable

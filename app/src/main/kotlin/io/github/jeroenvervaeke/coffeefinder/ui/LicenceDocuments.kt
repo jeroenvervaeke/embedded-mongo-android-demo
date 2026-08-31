@@ -14,7 +14,7 @@ val LICENCE_DOCUMENTS = listOf(
     LicenceDocument("Attribution and provenance", "places/ireland.attribution.txt"),
     LicenceDocument("Foursquare NOTICE", "places/licenses/NOTICE.txt"),
     LicenceDocument(
-        title = "Community Data License Agreement — Permissive 2.0",
+        title = "Community Data License Agreement, Permissive 2.0",
         asset = "places/licenses/CDLA-Permissive-2.0.txt",
     ),
     LicenceDocument("Apache License 2.0", "places/licenses/Apache-2.0.txt"),

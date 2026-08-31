@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.Color
  * The console palette: MongoDB's own greens on an evergreen ground.
  *
  * Dark only, and deliberately: this screen is an instrument. The map is a few thousand dots and a
- * radius ring drawn over a dark ground, and the readouts are meant to look like a readout — a
+ * radius ring drawn over a dark ground, and the readouts are meant to look like a readout; a
  * light scheme would need a second set of decisions for every one of them, and a dynamic-colour
  * one can leave the dots and the ground a step apart.
  */

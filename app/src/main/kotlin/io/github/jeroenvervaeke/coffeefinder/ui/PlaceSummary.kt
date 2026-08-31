@@ -7,7 +7,7 @@ import io.github.jeroenvervaeke.coffeefinder.data.model.Place
  * category when it gave neither.
  *
  * Overture leaves both optional and often supplies neither, so this is the one piece of the
- * screens with a decision in it — which is why it is a function rather than an expression buried
+ * screens with a decision in it, which is why it is a function rather than an expression buried
  * in a composable.
  */
 fun Place.summary(): String =

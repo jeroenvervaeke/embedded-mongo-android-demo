@@ -28,7 +28,7 @@ import kotlin.math.roundToInt
 /**
  * The headline: how many coffee places are inside the radius, and the radius itself.
  *
- * This is all the screen shows over the map when the list is down — a number, what it counts, and
+ * This is all the screen shows over the map when the list is down: a number, what it counts, and
  * the control that changes it. Everything else belongs to the list it opens into.
  */
 @Composable

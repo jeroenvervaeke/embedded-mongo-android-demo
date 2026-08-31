@@ -39,8 +39,8 @@ fun CrosshairIcon(colour: Color, modifier: Modifier = Modifier) {
 /**
  * Ireland, drawn as its own coastline.
  *
- * The outline is a coarse ring of real coordinates — Malin Head, Mizen Head, Erris Head and the
- * rest — projected the same way the map projects a place: longitude narrowed by the cosine of the
+ * The outline is a coarse ring of real coordinates (Malin Head, Mizen Head, Erris Head and the
+ * rest) projected the same way the map projects a place: longitude narrowed by the cosine of the
  * latitude it is at. So the icon is the shape the map draws, at 20 dp, rather than a squashed
  * approximation of it.
  */
@@ -91,7 +91,7 @@ private fun DrawScope.irelandPath(area: Size): Path {
  *
  * Forty points rather than a dozen: fewer and the west coast reads as teeth, smoothed and it
  * reads as a bean. This is the shape at about 15 km of detail, which is what a 22 dp icon can
- * hold — Donegal and Cork are in it, individual headlands are not.
+ * hold: Donegal and Cork are in it, individual headlands are not.
  */
 private val COAST = listOf(
     Coordinates(-7.37, 55.38), // Malin Head

@@ -43,10 +43,10 @@ class Seeder(
      *
      * [gzippedSeed] opens the shipped seed. A function rather than a stream so that collecting
      * this flow twice reads the seed twice rather than reading a stream that is already at its
-     * end — and so that the asset is not held open on the path where nothing needs it.
+     * end, and so that the asset is not held open on the path where nothing needs it.
      *
      * The whole flow runs on [readOn], because opening the asset, inflating it and decoding 5,180
-     * documents is all work that would otherwise happen wherever the collector is — which, for a
+     * documents is all work that would otherwise happen wherever the collector is, which, for a
      * progress screen, is the main thread.
      *
      * The indexes are built after the documents rather than before them: one build over a full
