@@ -63,7 +63,7 @@ fun AboutCard(title: String, modifier: Modifier = Modifier, content: @Composable
  * The category split, counted by the engine a moment ago.
  *
  * Drawn as arcs rather than as a bar chart because three of the four categories are rounding
- * errors — 5 cafeterias and 1 roastery against 5,180 documents — and a ring makes "almost all of
+ * errors (5 cafeterias and 1 roastery against 5,180 documents), and a ring makes "almost all of
  * it is two categories" legible in a way four bars do not. Each slice gets a visible minimum so
  * the roastery is on the screen at all.
  */

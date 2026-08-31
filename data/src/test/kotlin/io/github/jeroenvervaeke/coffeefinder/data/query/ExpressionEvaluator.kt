@@ -11,7 +11,7 @@ import org.bson.Document
  * document.
  *
  * Asserting the nested BSON literally would pin the shape of the expression without saying
- * anything about what it computes — and the thing worth knowing about a haversine written in
+ * anything about what it computes, and the thing worth knowing about a haversine written in
  * `$sin` and `$asin` is whether the number that comes out is the distance. So the test runs it,
  * the way the engine would, and checks the answer against distances that are a matter of record.
  */

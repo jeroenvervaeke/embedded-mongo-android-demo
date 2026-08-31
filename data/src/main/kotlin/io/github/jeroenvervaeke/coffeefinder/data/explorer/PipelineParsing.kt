@@ -28,7 +28,7 @@ fun parsePipeline(text: String): List<Document> {
         '[' -> readStages(trimmed)
         '{' -> listOf(readStage(trimmed))
         else -> throw PipelineFormatException(
-            "a pipeline is an array of stages, so it starts with `[` — this starts with " +
+            "a pipeline is an array of stages, so it starts with `[`, not " +
                 "`${trimmed.first()}`",
         )
     }

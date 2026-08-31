@@ -12,7 +12,7 @@ data class CanvasPoint(val x: Float, val y: Float)
  * Plate carrée, and deliberately so: the aspect correction that would otherwise be this
  * projection's job has already happened in [Camera.viewport], which sized the box to the canvas
  * rather than the other way round. What is left is a linear map, which is also what makes the
- * inverse exact — and the inverse is what turns a tap into a place.
+ * inverse exact, and the inverse is what turns a tap into a place.
  *
  * Latitude is flipped because north is up on a map and down the screen is where y grows.
  */

@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
      *
      * The four states of an Android permission, in the only order that behaves: already granted,
      * never asked, refused once, refused for good. The last is the one that needs the system
-     * settings screen — `shouldShowRequestPermissionRationale` reads false both before the first
+     * settings screen: `shouldShowRequestPermissionRationale` reads false both before the first
      * ask and after a permanent refusal, so it takes [asked] to tell those apart.
      */
     @Composable
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                     // The same state, reached by nobody asking. Opening system settings the user
                     // did not ask to see is a strange way to start an application, and leaving it
                     // at that is worse: the screen would sit on "Finding you…" with nothing
-                    // looking. Say what is true instead — there is no permission, so it is Dublin.
+                    // looking. Say what is true instead: there is no permission, so it is Dublin.
                     else -> model.locate()
                 }
             }
@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
         val request: () -> Unit = remember(ask) { { ask(true) } }
 
         // Runs once on a cold start, and has to: `asked` survives a process death and the
-        // ViewModel does not, so a restored process reaches `locate` no other way — whether it
+        // ViewModel does not, so a restored process reaches `locate` no other way, whether it
         // already holds the permission or will never hold it.
         LaunchedEffect(Unit) { ask(false) }
         return request

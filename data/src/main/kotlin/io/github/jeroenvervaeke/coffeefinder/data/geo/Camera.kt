@@ -15,7 +15,7 @@ import kotlin.math.min
  * Latitude rather than longitude because a degree of latitude is the same distance everywhere,
  * while a degree of longitude narrows towards the poles. Deriving the [Viewport] from the canvas
  * shape rather than fitting a fixed box into it is what keeps Ireland the right shape on a phone
- * and on a tablet, and it means the polygon sent to `$geoWithin` is exactly what is on screen —
+ * and on a tablet, and it means the polygon sent to `$geoWithin` is exactly what is on screen:
  * no letterboxed margin full of places that were queried and not drawn.
  */
 data class Camera(val centre: Coordinates, val latitudeSpan: Double) {
@@ -43,7 +43,7 @@ data class Camera(val centre: Coordinates, val latitudeSpan: Double) {
         )
     }
 
-    /** Zoomed in by [factor] — greater than one to see less of the world, and clamped either way. */
+    /** Zoomed in by [factor], greater than one to see less of the world, and clamped either way. */
     fun zoomedBy(factor: Double): Camera {
         require(factor > 0 && factor.isFinite()) { "a zoom factor of $factor is not a scale" }
         return copy(latitudeSpan = (latitudeSpan / factor).coerceIn(MINIMUM_SPAN, MAXIMUM_SPAN))
@@ -101,7 +101,7 @@ data class Camera(val centre: Coordinates, val latitudeSpan: Double) {
         }
 
         /**
-         * The whole island, framed for a portrait phone — so the first thing drawn is every
+         * The whole island, framed for a portrait phone, so the first thing drawn is every
          * document in the database. Reframed as soon as the canvas reports its real shape.
          */
         val IRELAND = covering(Ireland.EXTENT, PORTRAIT_ASPECT_RATIO)

@@ -13,7 +13,7 @@ import org.bson.Document
  * Runs a pipeline somebody typed, against the collection the rest of the application queries.
  *
  * The point of the screen this backs is that nothing is simulated: the text goes to the same
- * engine, in the same process, as the two queries behind the map — so an unsupported stage comes
+ * engine, in the same process, as the two queries behind the map, so an unsupported stage comes
  * back as MongoDB's own refusal rather than as a message this application made up.
  *
  * Results are read [batch] documents at a time and cut off there. A pipeline with no `$limit` in

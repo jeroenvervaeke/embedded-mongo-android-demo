@@ -12,7 +12,7 @@ import org.bson.Document
  * and not the other would put a number on screen that the rows below it contradict.
  *
  * Each field is a stage the console screen can switch on and off, which is why they end up as a
- * query document rather than being applied after the fact — the point of the screen is that the
+ * query document rather than being applied after the fact: the point of the screen is that the
  * engine did the filtering.
  */
 data class PlaceCriteria(

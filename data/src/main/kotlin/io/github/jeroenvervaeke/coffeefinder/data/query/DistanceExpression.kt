@@ -20,7 +20,7 @@ import org.bson.Document
  * ```
  *
  * `cos φ₀` and the origin's radians are constants folded in here rather than left to the engine.
- * Unlike `$geoNear` this reads every document the `$text` stage passed on — which is the point:
+ * Unlike `$geoNear` this reads every document the `$text` stage passed on, which is the point:
  * the index that narrowed the set was the text one.
  */
 internal fun distanceFromExpression(origin: Coordinates): Document {

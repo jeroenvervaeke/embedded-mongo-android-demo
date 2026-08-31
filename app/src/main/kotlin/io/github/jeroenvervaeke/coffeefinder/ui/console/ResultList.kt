@@ -50,7 +50,7 @@ data class ResultListState(
 /**
  * The list the sheet opens into: what to search for, what to keep, and the documents themselves.
  *
- * None of this is on screen while the sheet is shut — it sits below the peek, which is below the
+ * None of this is on screen while the sheet is shut: it sits below the peek, which is below the
  * bottom edge of the phone. A minimised map is a map, a count and a radius.
  */
 @Composable

@@ -13,8 +13,8 @@ const val NO_INDEX = "COLLSCAN"
  * Read out of the command that was sent rather than rebuilt from what the screen thinks it asked
  * for: the whole claim the console makes is that the line above the map is the pipeline below it.
  *
- * Each stage is its operator plus the one word that says which one it is — `$match cat`,
- * `$limit 50` — because `$match → $match → $match` tells a reader nothing.
+ * Each stage is its operator plus the one word that says which one it is (`$match cat`,
+ * `$limit 50`), because `$match → $match → $match` tells a reader nothing.
  */
 fun Document.stageLabels(): List<String> = stages().map(::label)
 
@@ -22,7 +22,7 @@ fun Document.stageLabels(): List<String> = stages().map(::label)
  * Which index served the pipeline in this command.
  *
  * A reading rather than a guess for the two shapes this application sends: `$geoNear` can only be
- * answered by the one `2dsphere` index in the collection, and `$text` by the one text index —
+ * answered by the one `2dsphere` index in the collection, and `$text` by the one text index:
  * MongoDB refuses both stages outright when their index is missing. Anything else is a collection
  * scan as far as this is concerned; a pipeline somebody typed is explained by the engine on the
  * explorer screen instead, which is where a guess would not be good enough.

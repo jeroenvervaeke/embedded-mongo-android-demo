@@ -49,7 +49,7 @@ data class MapSurface(
  * counts inside drawn over them.
  *
  * There is no map SDK here, no tiles and no API key. Ireland is recognisable because five
- * thousand coffee places are enough to draw its towns and its coast road — the shape is the data,
+ * thousand coffee places are enough to draw its towns and its coast road: the shape is the data,
  * not a basemap under it.
  *
  * The dots are projected from the *live* camera rather than from the viewport that was queried,

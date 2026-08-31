@@ -8,8 +8,8 @@ import kotlin.time.TimeSource
 /**
  * What starting up and each query actually cost, as logcat lines.
  *
- * The README makes numbers of both — how long the first launch takes, what a settled pan of the
- * map costs — and both are claims about a device rather than about this code. An emulator
+ * The README makes numbers of both (how long the first launch takes, what a settled pan of the
+ * map costs), and both are claims about a device rather than about this code. An emulator
  * sharing a host with three others answers a different question, and from outside the process
  * there is no way to check them on a phone short of filming the screen. So the application says
  * it out loud, and `adb logcat -s CoffeeTimings` is the whole measuring apparatus.
@@ -25,8 +25,8 @@ const val TIMINGS_TAG = "CoffeeTimings"
  *
  * A seam for the same reason the clock is one, and for a sharper reason: `android.util.Log` is a
  * stub that throws "not mocked" under JVM unit tests, so a class that calls it inline is a class
- * that cannot be tested at all. What [StartupTimer] decides — which phases are reported, and that
- * a dozen inserting progresses collapse into one line rather than a dozen — is worth a test, so
+ * that cannot be tested at all. What [StartupTimer] decides (which phases are reported, and that
+ * a dozen inserting progresses collapse into one line rather than a dozen) is worth a test, so
  * the logger is passed in exactly as the clock is.
  */
 fun interface TimingSink {
@@ -45,7 +45,7 @@ fun logQuery(screen: String, documents: Int, took: Duration, to: TimingSink = LO
  * One line per attempt at locating the device: what came back, and how long it took to come.
  *
  * The same reasoning as [logQuery]. Whether a phone measured from a fix, from Dublin, or gave up
- * waiting is invisible from outside the process — the screen says which, but not how long the
+ * waiting is invisible from outside the process: the screen says which, but not how long the
  * provider took to say nothing, and that is the number that decides whether the budget is right.
  */
 fun logLocation(outcome: String, took: Duration, to: TimingSink = LOGCAT) {
@@ -58,7 +58,7 @@ fun logLocation(outcome: String, took: Duration, to: TimingSink = LOGCAT) {
  * Per phase rather than one total, because the total is the least informative version of it: an
  * Ireland-sized seed is a bulk insert and two index builds, and which of those dominates on a
  * real phone is exactly what an emulator could not say. The phases come from [SeedProgress],
- * which the seeder already publishes for the screen — nothing here asks the engine anything.
+ * which the seeder already publishes for the screen; nothing here asks the engine anything.
  *
  * "Startup" rather than "cold start": the same phases are walked when the database is already
  * seeded, minus the inserting, and calling that a cold start would put a false label on the log

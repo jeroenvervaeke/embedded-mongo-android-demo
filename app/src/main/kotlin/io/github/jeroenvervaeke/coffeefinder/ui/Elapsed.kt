@@ -8,7 +8,7 @@ import kotlin.time.Duration.Companion.seconds
  * How long something took, as a reader sees it: milliseconds under a second, then seconds.
  *
  * In [locale], defaulting to the device's, for the same reason
- * [io.github.jeroenvervaeke.coffeefinder.data.model.Metres.describe] is — a reader in France
+ * [io.github.jeroenvervaeke.coffeefinder.data.model.Metres.describe] is: a reader in France
  * writes 41,3 ms. Tests pass [Locale.ROOT] so what they assert does not depend on the machine.
  *
  * A decimal either side of the boundary rather than whole milliseconds: a `$geoNear` over a

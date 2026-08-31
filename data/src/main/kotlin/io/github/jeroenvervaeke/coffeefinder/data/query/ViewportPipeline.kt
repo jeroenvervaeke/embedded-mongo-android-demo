@@ -7,7 +7,7 @@ import org.bson.Document
  * Every coffee place inside [viewport], up to [limit] of them.
  *
  * This is what the map asks as it is panned and zoomed: `$geoWithin` against the same `2dsphere`
- * index `$geoNear` walks, but selecting a region rather than ordering by distance from a point —
+ * index `$geoNear` walks, but selecting a region rather than ordering by distance from a point,
  * so nothing is sorted and nothing is measured, which is all the map needs to draw a dot.
  *
  * A `$project` keeps the reply to what a dot and its label need. Over a few thousand documents

@@ -17,8 +17,8 @@ import org.bson.Document
  * that claim rests on: that the text is the document rather than a paraphrase of it, and that it
  * is readable once it is.
  *
- * The commands come out of the library the same way the screen's do — `AggregateQuery.command()`
- * is what would be sent — rather than being written out here a second time.
+ * The commands come out of the library the same way the screen's do (`AggregateQuery.command()`
+ * is what would be sent) rather than being written out here a second time.
  */
 class JsonTest {
     @Test

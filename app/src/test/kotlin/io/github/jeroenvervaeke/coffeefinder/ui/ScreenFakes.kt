@@ -19,7 +19,7 @@ import org.bson.Document
  * An engine for the screen tests: it answers a `$count` with a number and everything else with
  * places, and remembers what it was asked.
  *
- * The same seam the data layer's tests use — the library's [CommandRunner] — so a screen can be
+ * The same seam the data layer's tests use (the library's [CommandRunner]), so a screen can be
  * driven with no engine, no emulator and no seed, while every pipeline it sends is real.
  */
 class FakeEngine(

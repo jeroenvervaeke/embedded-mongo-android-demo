@@ -13,8 +13,8 @@ const val COUNT_FIELD = "n"
  * different question with a `$limit` in it; this appends `$count` to the pipeline the list was
  * built from instead, so the two cannot drift apart.
  *
- * [stages] must be the uncapped form of that pipeline — the builders leave the `$limit` off when
- * they are given a `null` limit — because a `$count` after a `$limit` counts the cap.
+ * [stages] must be the uncapped form of that pipeline (the builders leave the `$limit` off when
+ * they are given a `null` limit), because a `$count` after a `$limit` counts the cap.
  */
 fun counting(stages: List<Document>): List<Document> {
     require(stages.none { it.containsKey("\$limit") }) {

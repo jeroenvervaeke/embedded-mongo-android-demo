@@ -29,7 +29,7 @@ import org.bson.Document
  * Results, and the command that produced them.
  *
  * The command travels with its own results rather than being rebuilt for display, so the pipeline
- * the application shows cannot drift from the one the engine actually ran — which is the whole
+ * the application shows cannot drift from the one the engine actually ran, which is the whole
  * claim the pipeline screen is making. It comes from `AggregateQuery.command()`, which is what
  * the library sends rather than a description of it.
  */
@@ -43,7 +43,7 @@ data class Queried<T>(val results: List<T>, val command: Document)
  * pages it; what is left here is the pipeline, the parsing, and where the parsing runs.
  *
  * [decodeOn] is where replies are turned into [Place]s. It matters: without it the parsing runs
- * wherever the *collector* is, which on Android is the main thread — six thousand documents of
+ * wherever the *collector* is, which on Android is the main thread: six thousand documents of
  * BSON on it for every settled pan of the map.
  *
  * `withContext` rather than `flowOn`, and the difference is the whole point: `flowOn` moves the

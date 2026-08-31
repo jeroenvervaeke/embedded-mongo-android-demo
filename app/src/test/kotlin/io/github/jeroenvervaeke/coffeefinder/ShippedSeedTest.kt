@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  *
  * The rest of the suite runs against documents the tests wrote themselves, which proves the
  * parser reads what the tests believe the seed looks like. This proves the seed looks like that
- * — the one claim a fake cannot make — and it is the only part of the data path that can be
+ * (the one claim a fake cannot make), and it is the only part of the data path that can be
  * checked without an engine.
  */
 class ShippedSeedTest {

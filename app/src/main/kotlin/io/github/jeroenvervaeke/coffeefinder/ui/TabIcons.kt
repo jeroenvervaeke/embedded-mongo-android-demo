@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 /**
  * The three tab icons, drawn rather than shipped.
  *
- * Line art at one weight, in the same voice as MongoDB's own icon set — and drawn here because
+ * Line art at one weight, in the same voice as MongoDB's own icon set, and drawn here because
  * the alternative is a vector-drawable resource per icon for three shapes that are a dozen points
  * each.
  *
@@ -88,7 +88,7 @@ private fun DrawScope.drawAboutIcon(colour: Color) {
 /**
  * Strokes a path written in the 24-unit box.
  *
- * The canvas is scaled rather than each coordinate, so the stroke is divided by the same factor —
+ * The canvas is scaled rather than each coordinate, so the stroke is divided by the same factor;
  * otherwise a 21 dp icon and a 40 dp one would be drawn at different weights.
  */
 private fun DrawScope.outline(colour: Color, build: Path.() -> Unit) {

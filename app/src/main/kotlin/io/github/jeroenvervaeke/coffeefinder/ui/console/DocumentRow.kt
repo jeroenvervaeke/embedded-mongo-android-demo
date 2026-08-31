@@ -24,7 +24,7 @@ import io.github.jeroenvervaeke.coffeefinder.ui.theme.MONO_CODE
  * The same result as the document it is: `_id`, `cat`, the GeoJSON point, and the distance the
  * pipeline measured.
  *
- * Written back out by [asDocument], which a round-trip test holds to the shape the seed stored —
+ * Written back out by [asDocument], which a round-trip test holds to the shape the seed stored,
  * so this is the document, not an illustration of one.
  */
 @Composable

@@ -10,7 +10,7 @@ import org.bson.Document
  * The list screen: the coffee places to show, and the command that found them.
  *
  * The command travels with the results rather than being rebuilt for display, so what the
- * pipeline screen shows is the document that crossed the bridge — which is the only version of
+ * pipeline screen shows is the document that crossed the bridge, which is the only version of
  * it worth showing.
  */
 sealed interface NearbyState {
@@ -24,7 +24,7 @@ sealed interface NearbyState {
          * How long the engine took to answer, measured around the two queries and nothing else.
          *
          * Both of them, because both are on the screen: the `$count` behind the headline and the
-         * capped list under it. Not the whole wait — the debounce in front of them is deliberately
+         * capped list under it. Not the whole wait: the debounce in front of them is deliberately
          * outside this, because the question it exists to answer is what the engine costs, and
          * adding a constant to every reading would only hide it.
          */

@@ -7,13 +7,13 @@
 
 **MongoDB, running inside an Android application. With the aeroplane mode switch on.**
 
-Every coffee place on the island of Ireland — 5,180 of them — searchable by name, sorted by
+Every coffee place on the island of Ireland, all 5,180 of them, searchable by name, sorted by
 distance from where you are standing, and plotted on a map. No server. No network call. No API
 key. No map SDK.
 
 The database is [embedded-mongodb][library]: MongoDB's own query engine and WiredTiger storage,
 compiled into the application process. Not a MongoDB-compatible reimplementation with a
-MongoDB-shaped name on it — MongoDB's actual server code, answering `$geoNear`, `$text` and
+MongoDB-shaped name on it: MongoDB's actual server code, answering `$geoNear`, `$text` and
 `$geoWithin` out of a directory in the app's private storage.
 
 > [!NOTE]
@@ -23,7 +23,7 @@ MongoDB-shaped name on it — MongoDB's actual server code, answering `$geoNear`
 ## The same MongoDB you already write
 
 This is the whole of the "what is nearest" query. It is a `MongoCollection`, an aggregation
-pipeline, and `org.bson.Document` — the API every MongoDB developer already has in their hands:
+pipeline, and `org.bson.Document`, the API every MongoDB developer already has in their hands:
 
 ```kotlin
 val pipeline = listOf(
@@ -51,7 +51,7 @@ itself. Point the same pipeline at Atlas and it runs unchanged.
   is a file. Nothing to install, provision, or keep running beside the app.
 - 🗺️ **The whole query surface, not a subset.** `$geoNear` over a `2dsphere` index, `$text`
   over a text index, `$geoWithin` with a polygon, and a haversine written in the engine's own
-  `$sin`, `$asin` and `$degreesToRadians` — planned and executed by MongoDB.
+  `$sin`, `$asin` and `$degreesToRadians`, all planned and executed by MongoDB.
 - 🧪 **A data layer you can test on a laptop.** The whole of it is plain Kotlin against the
   library's Android-free core module: 140 tests, no emulator, no compiled engine.
 - 🌍 **One engine across ecosystems.** Rust and Python today, Android here, the same C ABI
@@ -63,7 +63,7 @@ SQLite is the reflex answer to on-device storage, and it is a fine database. It 
 shape for this data, and for any application whose data also lives on a server.
 
 - 📄 **The document model, all the way down.** A coffee place *is* a document: a name, a
-  category, a GeoJSON point, and an address whose every field is optional — street, locality,
+  category, a GeoJSON point, and an address whose every field is optional: street, locality,
   postcode, region, any of them absent. In SQLite that is a `places` table plus a ladder of
   nullable columns, or a join to an addresses table, and either way the place is decomposed on
   the way in and reassembled on the way out, by hand or by an ORM. Here it is stored as the
@@ -76,7 +76,7 @@ shape for this data, and for any application whose data also lives on a server.
   are. A SQLite build of this needs an ETL step that flattens them into rows first, and that
   step has to be maintained in step with the schema on both ends.
 - 🗺️ **Geospatial without a bolted-on extension.** SQLite's R\*Tree indexes bounding boxes, so
-  "nearest, in order" is a box query followed by a haversine you write and a sort you pay for —
+  "nearest, in order" is a box query followed by a haversine you write and a sort you pay for,
   or SpatiaLite, a second dependency. `$geoNear` walks a `2dsphere` index outwards from the
   point and returns the 50 the list asks for, already ordered, having read 50 rather than
   5,180.
@@ -111,7 +111,7 @@ reports `modules: ["embedded"]`, which no real `mongod` ever does.
 
 The map is a `Canvas`, drawn from the coordinates the query returned. There are no tiles under
 it and no map SDK in the build. Ireland is recognisable because five thousand coffee places are
-enough to draw its towns and its coast road — the shape *is* the data. One `$geoWithin` with a
+enough to draw its towns and its coast road: the shape *is* the data. One `$geoWithin` with a
 polygon returns all 5,180 in 51–75 ms.
 
 ## On a real phone
@@ -124,11 +124,11 @@ Measured on a Galaxy S23 Ultra, release build, five runs each:
 | Warm start, database only | **0.3–0.6 s**. Nothing is re-seeded |
 | The 50 nearest, `$geoNear` | **15–38 ms** |
 | Every place on the island, one query | **71–114 ms** |
-| Database on disk | **10.3 MiB** — 1.5 MB documents, 0.7 MB indexes, 8 MiB journal |
+| Database on disk | **10.3 MiB**, of which 1.5 MB documents, 0.7 MB indexes, 8 MiB journal |
 | Release APK | **59 MiB** per ABI, of which the engine is 46 MiB |
 
-Killed mid-flight with the engine open, it reopens with exactly 5,180 places in 466 ms — no
-repair, no reseed.
+Killed mid-flight with the engine open, it reopens with exactly 5,180 places in 466 ms, with no
+repair and no reseed.
 
 ## Build it
 
@@ -157,8 +157,8 @@ application stores.
 © 2026 Foursquare Labs, Inc. All rights reserved.
 
 Contributing datasets are covered by CDLA-Permissive-2.0, the Apache License 2.0 with the
-Foursquare NOTICE, and CC0-1.0. **All four texts ship inside the application** — in
-`app/src/main/assets/places/licenses/`, shown in full on the About screen — because naming a
+Foursquare NOTICE, and CC0-1.0. **All four texts ship inside the application**, in
+`app/src/main/assets/places/licenses/`, shown in full on the About screen, because naming a
 licence does not satisfy it: CDLA-Permissive-2.0 section 2.1 and the NOTICE both require the
 text to travel with the data. CC0-1.0 imposes no such condition and is shipped anyway, so that
 every licence the data is under can be read inside the application.

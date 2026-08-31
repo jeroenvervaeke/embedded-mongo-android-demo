@@ -29,12 +29,12 @@ import io.github.jeroenvervaeke.coffeefinder.ui.theme.Console
 import io.github.jeroenvervaeke.coffeefinder.ui.theme.MONO_LABEL
 
 /**
- * Frames the map on the radius the count is counting inside — once when the screen opens, and
+ * Frames the map on the radius the count is counting inside: once when the screen opens, and
  * again when the device finally says where it is.
  *
  * Not on every change of origin: a tap on the map is a change of origin, and a map that jumped
  * back to the middle every time somebody dropped a pin would be unusable. Nor after a pan or a
- * pinch — [MapFinder.frameOnUnlessMoved] leaves a camera somebody has taken over alone, which is
+ * pinch: [MapFinder.frameOnUnlessMoved] leaves a camera somebody has taken over alone, which is
  * also what stops a trip to another tab and back from re-framing it.
  */
 @Composable
@@ -70,7 +70,7 @@ fun OriginBadge(source: LocationSource, onLocate: () -> Unit, modifier: Modifier
 /**
  * The two ways back to a view worth having: the radius, and the island.
  *
- * Both matter because both are reachable by hand and neither is easy to get back to — pinching
+ * Both matter because both are reachable by hand and neither is easy to get back to: pinching
  * out from a street to the whole of Ireland is a dozen gestures.
  */
 @Composable
